@@ -76,7 +76,11 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
   setPlaybackState: (newState) => set((state) => ({ ...state, ...newState })),
 
   syncTime: (position, duration) => {
-    set({ position, duration });
+    const update: Partial<MediaPlayerState> = { position };
+    if (duration !== undefined && isFinite(duration) && duration > 0) {
+      update.duration = duration;
+    }
+    set(update);
     window.electronAPI.media.syncTime(position, duration);
   },
 

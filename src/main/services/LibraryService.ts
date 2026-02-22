@@ -89,28 +89,31 @@ export class LibraryService {
       for (const file of files) {
         const ext = path.extname(file).toLowerCase();
         if (supportedExts.includes(ext)) {
-          // If already exists, skip or update?
-          // Skip expensive metadata if size/mtime hasn't changed?
-          // For now, check if path exists.
           if (existingMap.has(file)) {
             newTracks.push(existingMap.get(file) as LibraryTrack);
             continue;
           }
 
           try {
-            const metadata = await this.metadataService.getMetadata(file);
+            const isImage = imageExts.includes(ext);
+            let metadata: any = {};
+
+            if (!isImage) {
+              // Only use ffprobe for audio/video to avoid delays/errors on images
+              metadata = await this.metadataService.getMetadata(file);
+            }
 
             const track: LibraryTrack = {
               id: this.generateId(file),
               path: file,
               title: metadata.tags?.title || path.basename(file, ext),
-              artist: metadata.tags?.artist || 'Unknown Artist',
-              album: metadata.tags?.album || 'Unknown Album',
-              duration: metadata.duration,
-              format: metadata.format,
+              artist: metadata.tags?.artist || (isImage ? 'Photo' : 'Unknown Artist'),
+              album: metadata.tags?.album || (isImage ? 'Gallery' : 'Unknown Album'),
+              duration: metadata.duration || 0,
+              format: metadata.format || ext.replace('.', ''),
               addedAt: Date.now(),
               lastModified: Date.now(),
-              mediaType: imageExts.includes(ext) ? 'image' : (videoExts.includes(ext) ? 'video' : 'audio'),
+              mediaType: isImage ? 'image' : (videoExts.includes(ext) ? 'video' : 'audio'),
             };
 
             newTracks.push(track);

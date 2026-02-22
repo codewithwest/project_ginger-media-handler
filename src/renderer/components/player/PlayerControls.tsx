@@ -93,17 +93,32 @@ export function PlayerControls({
     window.electronAPI.window.toggleFullScreen();
   };
 
+  const getValidPosition = (val: number, dur: number) => {
+    if (isNaN(val) || !isFinite(val)) return 0;
+    if (isNaN(dur) || !isFinite(dur) || dur <= 0) return 0;
+    return Math.min(dur, Math.max(0, val));
+  };
+
+  const currentPos = getValidPosition(isDragging ? dragValue : position, duration || 0);
+  const progressPercent = duration && duration > 0
+    ? Math.min(100, Math.max(0, (currentPos / duration) * 100))
+    : 0;
+
+  const hoverPercent = duration && duration > 0 && progressRef.current
+    ? Math.min(100, Math.max(0, (hoverX / progressRef.current.clientWidth) * 100))
+    : 0;
+
   return (
     <div className="flex flex-col gap-2 w-full animate-fade-in">
       {/* Progress Bar - Hidden for YouTube as it has its own controls usually or we can't sync well */}
       {!isYouTube && (
         <div className="flex items-center gap-4 w-full px-2 animate-in fade-in slide-in-from-top-2 duration-500">
           <span className="text-[10px] text-gray-500 w-[38px] text-right font-mono tabular-nums shrink-0">
-            {formatTime(isDragging ? dragValue : position)}
+            {formatTime(currentPos)}
           </span>
           <div
             ref={progressRef}
-            className="flex-1 relative group h-6 flex items-center"
+            className={`flex-1 relative group h-6 flex items-center transition-opacity duration-500 ${!duration || duration <= 0 ? 'opacity-40 cursor-not-allowed' : ''}`}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
           >
@@ -111,7 +126,7 @@ export function PlayerControls({
             {hoverTime !== null && (
               <div
                 className="absolute bottom-full mb-2 -translate-x-1/2 px-2 py-1 bg-black/90 border border-white/10 rounded text-[10px] font-mono text-white pointer-events-none z-50 animate-in fade-in zoom-in-95"
-                style={{ left: `${(hoverX / (progressRef.current?.clientWidth || 1)) * 100}%` }}
+                style={{ left: `${hoverPercent}%` }}
               >
                 {formatTime(hoverTime)}
               </div>
@@ -120,8 +135,9 @@ export function PlayerControls({
             <input
               type="range"
               min="0"
-              max={duration || 100}
-              value={isDragging ? dragValue : position}
+              max={duration || 0}
+              disabled={!duration || duration <= 0}
+              value={currentPos}
               onChange={handleSeek}
               onMouseDown={handleMouseDown}
               onMouseUp={handleMouseUp}
@@ -139,14 +155,14 @@ export function PlayerControls({
             />
             {/* Background Track */}
             <div
-              className="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 bg-primary-500 rounded-full pointer-events-none shadow-[0_0_10px_rgba(14,165,233,0.5)]"
-              style={{ width: `${((isDragging ? dragValue : position) / (duration || 100)) * 100}%` }}
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 bg-primary-500 rounded-full pointer-events-none shadow-[0_0_10px_rgba(14,165,233,0.5)] transition-all duration-100"
+              style={{ width: `${progressPercent}%` }}
             />
             {/* Hover Line */}
             {hoverTime !== null && (
               <div
                 className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-white/20 rounded-full pointer-events-none"
-                style={{ width: `${(hoverX / (progressRef.current?.clientWidth || 1)) * 100}%` }}
+                style={{ width: `${hoverPercent}%` }}
               />
             )}
           </div>

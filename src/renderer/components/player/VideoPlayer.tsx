@@ -52,11 +52,13 @@ export function VideoPlayer() {
   // Sync Seek (Position) - careful to avoid loops
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isNaN(position) || !isFinite(position)) return;
 
     // Only seek if the difference is significant (> 0.5s) to avoid fighting with timeUpdate
-    if (Math.abs(video.currentTime - position) > 0.5) {
-      video.currentTime = position;
+    // Also ensure we don't seek past the video's actual duration to avoid "crazy" behavior
+    const targetPos = Math.max(0, Math.min(position, video.duration || position));
+    if (Math.abs(video.currentTime - targetPos) > 0.5) {
+      video.currentTime = targetPos;
     }
   }, [position]);
 
