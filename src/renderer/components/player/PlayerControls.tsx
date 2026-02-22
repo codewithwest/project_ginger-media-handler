@@ -1,4 +1,5 @@
-import { Play, Pause, SkipForward, SkipBack, Shuffle, Repeat, Volume2, Maximize, ListMusic, SlidersHorizontal, Gauge, EyeOff } from 'lucide-react';
+import { useRef, useState, useCallback } from 'react';
+import { Play, Pause, SkipForward, SkipBack, Shuffle, Repeat, Volume2, VolumeX, Maximize, ListMusic, SlidersHorizontal, Gauge, EyeOff } from 'lucide-react';
 import { useMediaPlayerStore } from '../../state/media-player';
 import { Tooltip } from '../ui/Tooltip';
 
@@ -23,6 +24,7 @@ export function PlayerControls({
     shuffle,
     repeat,
     volume,
+    isMuted,
     position,
     duration,
     play,
@@ -33,9 +35,16 @@ export function PlayerControls({
     toggleShuffle,
     toggleRepeat,
     setVolume,
+    toggleMute,
     playbackSpeed,
     setSpeed,
   } = useMediaPlayerStore();
+
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragValue, setDragValue] = useState(0);
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [hoverX, setHoverX] = useState(0);
+  const progressRef = useRef<HTMLDivElement>(null);
 
   const isPlaying = status === 'playing';
   const isYouTube = currentSource?.providerId === 'youtube';
@@ -49,8 +58,28 @@ export function PlayerControls({
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPosition = parseFloat(e.target.value) || 0;
-    seek(newPosition);
+    setDragValue(newPosition);
+    if (!isDragging) {
+      seek(newPosition);
+    }
   };
+
+  const handleMouseDown = () => setIsDragging(true);
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    seek(dragValue);
+  };
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!progressRef.current || !duration) return;
+    const rect = progressRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const percentage = x / rect.width;
+    setHoverTime(percentage * duration);
+    setHoverX(x);
+  }, [duration]);
+
+  const handleMouseLeave = () => setHoverTime(null);
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -70,31 +99,56 @@ export function PlayerControls({
       {!isYouTube && (
         <div className="flex items-center gap-4 w-full px-2 animate-in fade-in slide-in-from-top-2 duration-500">
           <span className="text-[10px] text-gray-500 w-[38px] text-right font-mono tabular-nums shrink-0">
-            {formatTime(position)}
+            {formatTime(isDragging ? dragValue : position)}
           </span>
-          <div className="flex-1 relative group h-6 flex items-center">
+          <div
+            ref={progressRef}
+            className="flex-1 relative group h-6 flex items-center"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
+            {/* Hover Timestamp Tooltip */}
+            {hoverTime !== null && (
+              <div
+                className="absolute bottom-full mb-2 -translate-x-1/2 px-2 py-1 bg-black/90 border border-white/10 rounded text-[10px] font-mono text-white pointer-events-none z-50 animate-in fade-in zoom-in-95"
+                style={{ left: `${(hoverX / (progressRef.current?.clientWidth || 1)) * 100}%` }}
+              >
+                {formatTime(hoverTime)}
+              </div>
+            )}
+
             <input
               type="range"
               min="0"
               max={duration || 100}
-              value={position}
+              value={isDragging ? dragValue : position}
               onChange={handleSeek}
-              className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer z-10
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
+              className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer z-10
                 accent-primary-500
                 hover:accent-primary-400
                 [&::-webkit-slider-thumb]:appearance-none
                 [&::-webkit-slider-thumb]:w-0
                 [&::-webkit-slider-thumb]:h-0
-                group-hover:[&::-webkit-slider-thumb]:w-3
-                group-hover:[&::-webkit-slider-thumb]:h-3
+                group-hover:[&::-webkit-slider-thumb]:w-4
+                group-hover:[&::-webkit-slider-thumb]:h-4
                 group-hover:[&::-webkit-slider-thumb]:bg-white
                 group-hover:[&::-webkit-slider-thumb]:rounded-full
-                group-hover:[&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                group-hover:[&::-webkit-slider-thumb]:shadow-[0_0_15px_rgba(255,255,255,0.8)]"
             />
+            {/* Background Track */}
             <div
-              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary-500 rounded-full pointer-events-none"
-              style={{ width: `${(position / (duration || 100)) * 100}%` }}
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1.5 bg-primary-500 rounded-full pointer-events-none shadow-[0_0_10px_rgba(14,165,233,0.5)]"
+              style={{ width: `${((isDragging ? dragValue : position) / (duration || 100)) * 100}%` }}
             />
+            {/* Hover Line */}
+            {hoverTime !== null && (
+              <div
+                className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-white/20 rounded-full pointer-events-none"
+                style={{ width: `${(hoverX / (progressRef.current?.clientWidth || 1)) * 100}%` }}
+              />
+            )}
           </div>
           <span className="text-[10px] text-gray-500 w-[38px] font-mono tabular-nums shrink-0">
             {formatTime(duration)}
@@ -160,8 +214,17 @@ export function PlayerControls({
         {/* Right: Volume & Extra */}
         <div className="flex items-center justify-end gap-3 w-1/3">
           <div className="flex items-center gap-2 group/vol">
-            <Volume2 className="w-4 h-4 text-gray-500 group-hover/vol:text-gray-300 transition-colors" />
-            <div className="w-20 relative h-1 bg-white/10 rounded-full overflow-hidden">
+            <button
+              onClick={toggleMute}
+              className="p-1 hover:bg-white/5 rounded-lg transition-colors"
+            >
+              {isMuted ? (
+                <VolumeX className="w-4 h-4 text-red-500" />
+              ) : (
+                <Volume2 className="w-4 h-4 text-gray-500 group-hover/vol:text-gray-300 transition-colors" />
+              )}
+            </button>
+            <div className={`w-20 relative h-1 bg-white/10 rounded-full overflow-hidden transition-opacity ${isMuted ? 'opacity-30' : 'opacity-100'}`}>
               <input
                 type="range"
                 min="0"
@@ -172,7 +235,7 @@ export function PlayerControls({
                 className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
               />
               <div
-                className="h-full bg-gray-400 group-hover/vol:bg-primary-500 transition-colors"
+                className={`h-full transition-colors ${isMuted ? 'bg-red-500/50' : 'bg-gray-400 group-hover/vol:bg-primary-500'}`}
                 style={{ width: `${volume * 100}%` }}
               />
             </div>

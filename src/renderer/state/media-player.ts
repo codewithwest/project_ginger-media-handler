@@ -6,6 +6,8 @@ import type { PlaybackState, MediaSource, MediaMetadata, MediaPlayerState } from
 interface MediaPlayerStore extends MediaPlayerState {
   playlist: MediaSource[];
   currentIndex: number;
+  playbackSpeed: number;
+  isMuted: boolean;
   streamUrl?: string;
   metadata?: MediaMetadata;
 
@@ -20,6 +22,7 @@ interface MediaPlayerStore extends MediaPlayerState {
   stop: () => void;
   seek: (position: number) => void;
   setVolume: (volume: number) => void;
+  toggleMute: () => void;
   next: () => void;
   previous: () => void;
   toggleShuffle: () => void;
@@ -43,6 +46,7 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
   shuffle: false,
   repeat: 'off',
   playbackSpeed: 1.0,
+  isMuted: false,
   streamUrl: undefined,
   metadata: undefined,
   playlist: [],
@@ -89,6 +93,8 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
     set({ volume });
     window.electronAPI.media.setVolume(volume);
   },
+
+  toggleMute: () => window.electronAPI.media.toggleMute(),
 
   next: () => window.electronAPI.media.next(),
   previous: () => window.electronAPI.media.previous(),

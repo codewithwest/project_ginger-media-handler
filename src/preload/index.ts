@@ -37,6 +37,8 @@ const electronAPI = {
       ipcRenderer.invoke('playback:seek', position),
     setVolume: (volume: number): Promise<void> =>
       ipcRenderer.invoke('playback:set-volume', volume),
+    toggleMute: (): Promise<void> =>
+      ipcRenderer.invoke('playback:toggle-mute'),
     next: (): Promise<void> =>
       ipcRenderer.invoke('playback:next'),
     previous: (): Promise<void> =>
