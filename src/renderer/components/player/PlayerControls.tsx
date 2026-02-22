@@ -1,5 +1,6 @@
 import { Play, Pause, SkipForward, SkipBack, Shuffle, Repeat, Volume2, Maximize, ListMusic, SlidersHorizontal, Gauge } from 'lucide-react';
 import { useMediaPlayerStore } from '../../state/media-player';
+import { Tooltip } from '../ui/Tooltip';
 
 interface PlayerControlsProps {
   onToggleQueue?: () => void;
@@ -92,51 +93,56 @@ export function PlayerControls({ onToggleQueue, queueVisible, onToggleEqualizer 
       <div className="flex items-center justify-between w-full h-14">
         {/* Left: Secondary controls */}
         <div className="flex items-center gap-1 w-1/3">
-          <button
-            onClick={toggleShuffle}
-            className={`p-2 rounded-xl transition-all duration-300 ${shuffle ? 'text-primary-500 bg-primary-500/10 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
-            title="Shuffle"
-          >
-            <Shuffle className="w-4 h-4" />
-          </button>
-          <button
-            onClick={toggleRepeat}
-            className={`p-2 rounded-xl transition-all duration-300 ${repeat !== 'off' ? 'text-primary-500 bg-primary-500/10 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
-            title={`Repeat: ${repeat}`}
-          >
-            <Repeat className="w-4 h-4" />
-          </button>
+          <Tooltip content="Shuffle" position="top">
+            <button
+              onClick={toggleShuffle}
+              className={`p-2 rounded-xl transition-all duration-300 ${shuffle ? 'text-primary-500 bg-primary-500/10 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
+            >
+              <Shuffle className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content={`Repeat: ${repeat}`} position="top">
+            <button
+              onClick={toggleRepeat}
+              className={`p-2 rounded-xl transition-all duration-300 ${repeat !== 'off' ? 'text-primary-500 bg-primary-500/10 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
+            >
+              <Repeat className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Center: Main controls */}
         <div className="flex items-center gap-6">
-          <button
-            onClick={previous}
-            className="p-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-all duration-300 transform active:scale-90"
-            title="Previous"
-          >
-            <SkipBack className="w-6 h-6 fill-current" />
-          </button>
+          <Tooltip content="Previous" position="top">
+            <button
+              onClick={previous}
+              className="p-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-all duration-300 transform active:scale-90"
+            >
+              <SkipBack className="w-6 h-6 fill-current" />
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={handlePlayPause}
-            className="w-14 h-14 rounded-2xl bg-white text-black hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center shadow-[0_8px_30px_rgb(255,255,255,0.2)]"
-            title={isPlaying ? 'Pause' : 'Play'}
-          >
-            {isPlaying ? (
-              <Pause className="w-6 h-6 fill-current" />
-            ) : (
-              <Play className="w-6 h-6 ml-1 fill-current" />
-            )}
-          </button>
+          <Tooltip content={isPlaying ? 'Pause' : 'Play'} position="top">
+            <button
+              onClick={handlePlayPause}
+              className="w-14 h-14 rounded-2xl bg-white text-black hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center shadow-[0_8px_30px_rgb(255,255,255,0.2)]"
+            >
+              {isPlaying ? (
+                <Pause className="w-6 h-6 fill-current" />
+              ) : (
+                <Play className="w-6 h-6 ml-1 fill-current" />
+              )}
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={next}
-            className="p-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-all duration-300 transform active:scale-90"
-            title="Next"
-          >
-            <SkipForward className="w-6 h-6 fill-current" />
-          </button>
+          <Tooltip content="Next" position="top">
+            <button
+              onClick={next}
+              className="p-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-all duration-300 transform active:scale-90"
+            >
+              <SkipForward className="w-6 h-6 fill-current" />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Right: Volume & Extra */}
@@ -162,42 +168,46 @@ export function PlayerControls({ onToggleQueue, queueVisible, onToggleEqualizer 
 
           <div className="w-[1px] h-4 bg-white/10 mx-2" />
 
-          <button
-            onClick={onToggleEqualizer}
-            className="p-2 text-gray-500 hover:text-gray-300 hover:bg-white/5 rounded-xl transition-all"
-            title="Equalizer"
-          >
-            <SlidersHorizontal className="w-4 h-4" />
-          </button>
-          
-          <button
-            onClick={() => {
+          <Tooltip content="Equalizer" position="top">
+            <button
+              onClick={onToggleEqualizer}
+              className="p-2 text-gray-500 hover:text-gray-300 hover:bg-white/5 rounded-xl transition-all"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+          </Tooltip>
+
+          <Tooltip content="Playback Speed" position="top">
+            <button
+              onClick={() => {
                 const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
                 const nextIndex = (speeds.indexOf(playbackSpeed) + 1) % speeds.length;
                 setSpeed(speeds[nextIndex]);
-            }}
-            className="flex items-center gap-1.5 px-2 py-1 bg-white/5 hover:bg-white/10 rounded-lg transition-all border border-white/5"
-            title="Playback Speed"
-          >
-            <Gauge className="w-3.5 h-3.5 text-gray-400" />
-            <span className="text-[10px] font-bold text-gray-300 font-mono w-8 text-left">{playbackSpeed}x</span>
-          </button>
+              }}
+              className="flex items-center gap-1.5 px-2 py-1 bg-white/5 hover:bg-white/10 rounded-lg transition-all border border-white/5"
+            >
+              <Gauge className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-[10px] font-bold text-gray-300 font-mono w-8 text-left">{playbackSpeed}x</span>
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={handleToggleFullScreen}
-            className="p-2 text-gray-500 hover:text-gray-300 hover:bg-white/5 rounded-xl transition-all"
-            title="Full Screen"
-          >
-            <Maximize className="w-4 h-4" />
-          </button>
+          <Tooltip content="Full Screen" position="top">
+            <button
+              onClick={handleToggleFullScreen}
+              className="p-2 text-gray-500 hover:text-gray-300 hover:bg-white/5 rounded-xl transition-all"
+            >
+              <Maximize className="w-4 h-4" />
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={onToggleQueue}
-            className={`p-2 rounded-xl transition-all ${queueVisible ? 'text-primary-500 bg-primary-500/10 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
-            title="Toggle Queue"
-          >
-            <ListMusic className="w-4 h-4" />
-          </button>
+          <Tooltip content="Toggle Queue" position="top">
+            <button
+              onClick={onToggleQueue}
+              className={`p-2 rounded-xl transition-all ${queueVisible ? 'text-primary-500 bg-primary-500/10 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
+            >
+              <ListMusic className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>

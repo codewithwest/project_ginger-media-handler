@@ -70,6 +70,28 @@ export class PlaybackService extends EventEmitter {
          this.playlistService.save(this.playlist);
          this.notifyStateChanged();
       });
+
+      ipcMain.handle('playback:remove-from-playlist', (_event, { index }: { index: number }) => {
+         if (index < 0 || index >= this.playlist.length) return;
+         this.playlist.splice(index, 1);
+         // Adjust currentIndex if we removed something at or before it
+         if (index < this.currentIndex) {
+            this.currentIndex--;
+         } else if (index === this.currentIndex) {
+            // Removed the playing track — stop playback or move to next
+            if (this.playlist.length === 0) {
+               this.currentIndex = -1;
+               this.state.currentSource = null;
+               this.state.status = 'stopped';
+            } else {
+               // clamp to last if we were at the end
+               this.currentIndex = Math.min(this.currentIndex, this.playlist.length - 1);
+               this.state.currentSource = this.playlist[this.currentIndex];
+            }
+         }
+         this.playlistService.save(this.playlist);
+         this.notifyStateChanged();
+      });
    }
 
    public toggle() {

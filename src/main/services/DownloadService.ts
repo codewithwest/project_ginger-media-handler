@@ -36,9 +36,11 @@ export class DownloadService {
   async init(): Promise<void> {
     try {
       const ffmpegFileName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+      const ffprobeFileName = process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
       const ytDlpFileName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 
       const ffmpegPath = path.join(this.binPath, ffmpegFileName);
+      const ffprobePath = path.join(this.binPath, ffprobeFileName);
       const ytDlpPath = path.join(this.binPath, ytDlpFileName);
 
       if (!fs.existsSync(ytDlpPath)) {
@@ -57,6 +59,19 @@ export class DownloadService {
         }
       }
 
+      // Ensure all binaries are executable (critical when userData dir changes)
+      if (process.platform !== 'win32') {
+        for (const binFile of [ffmpegPath, ffprobePath, ytDlpPath]) {
+          if (fs.existsSync(binFile)) {
+            try {
+              fs.chmodSync(binFile, 0o755);
+            } catch (e) {
+              console.warn(`[DownloadService] Could not chmod ${binFile}:`, e);
+            }
+          }
+        }
+      }
+
       if (fs.existsSync(ytDlpPath)) {
         const ffPath = fs.existsSync(ffmpegPath) ? ffmpegPath : undefined;
         this.ytdlp = new YtDlp({
@@ -64,8 +79,7 @@ export class DownloadService {
           ffmpegPath: ffPath
         });
 
-        const probePath = this.getFFprobePath();
-        this.metadataService = new MediaMetadataService(fs.existsSync(probePath) ? probePath : undefined);
+        this.metadataService = new MediaMetadataService(fs.existsSync(ffprobePath) ? ffprobePath : undefined);
       }
     } catch (error) {
       console.error('[DownloadService] Unexpected error during init:', error);

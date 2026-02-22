@@ -117,6 +117,34 @@ export function VideoPlayer() {
     }
   }, [initAudio]);
 
+  if (currentSource?.providerId === 'youtube') {
+    let videoId = '';
+    try {
+      if (currentSource.path.includes('v=')) {
+        videoId = new URL(currentSource.path).searchParams.get('v') || '';
+      } else if (currentSource.path.includes('youtu.be/')) {
+        videoId = currentSource.path.split('youtu.be/')[1].split('?')[0];
+      }
+    } catch (e) {
+      console.error("Failed to parse YouTube URL for embed", e);
+    }
+
+    if (videoId) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-black overflow-hidden relative z-[50]">
+          <iframe
+            className="w-full h-full z-10 absolute inset-0"
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+            title="YouTube Video Player"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      );
+    }
+  }
+
   if (!streamUrl) return null;
 
   return (

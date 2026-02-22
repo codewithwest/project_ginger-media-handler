@@ -119,8 +119,8 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
     window.electronAPI.media.addToPlaylist(item, playNow);
   },
 
-  removeFromPlaylist: () => {
-    // TODO: Implement in PlaybackService
+  removeFromPlaylist: (index: number) => {
+    window.electronAPI.media.removeFromPlaylist(index);
   },
 
   clearPlaylist: () => window.electronAPI.media.clearPlaylist(),
@@ -130,7 +130,27 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
     if (index < 0 || index >= playlist.length) return;
 
     const item = playlist[index];
+
+    // YouTube items stream via iframe — skip ffprobe/getStreamUrl entirely
+    if (item.providerId === 'youtube') {
+      set({
+        currentSource: item,
+        currentIndex: index,
+        // Set a non-empty sentinel so VideoPlayer doesn't gate on `if (!streamUrl) return null`
+        streamUrl: item.path,
+        metadata: undefined,
+        duration: item.duration || 0,
+        position: 0,
+        status: 'playing',
+      });
+      return;
+    }
+
     try {
+      // Clear any stale streamUrl immediately so VideoPlayer doesn't
+      // briefly show the old track (e.g. a YouTube URL) while loading
+      set({ streamUrl: undefined });
+
       const url = await window.electronAPI.media.getStreamUrl(item);
       const metadata = await window.electronAPI.media.getMetadata(item.path);
       const resumePos = await window.electronAPI.media.getResumePosition(item.id);

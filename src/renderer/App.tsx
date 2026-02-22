@@ -5,11 +5,12 @@ import { useEffect, useState, CSSProperties } from 'react';
 import { Background3D } from './components/3d/Background3D';
 import { PlayerControls } from './components/player/PlayerControls';
 import { useMediaPlayerStore } from './state/media-player';
-import { Disc3, FolderOpen, Activity, Music, FileText, ListMusic, Wifi, Puzzle, Zap, Search as SearchIcon, EyeOff } from 'lucide-react';
+import { Disc3, FolderOpen, Activity, Music, FileText, ListMusic, Wifi, Puzzle, Zap, Search as SearchIcon, EyeOff, Youtube } from 'lucide-react';
 import { NetworkView } from './components/network/NetworkView';
 import { ConverterView } from './components/converter/ConverterView';
 import { ImageBrowser } from './components/library/ImageBrowser';
 import { SearchView } from './components/search/SearchView';
+import { YouTubeView } from './components/youtube/YouTubeView';
 import { PluginSettingsView } from './components/plugins/PluginSettingsView';
 import { usePluginStore } from './state/plugins';
 import { useProviderStore } from './state/providers';
@@ -20,6 +21,7 @@ import { LibraryView } from './components/library/LibraryView';
 import { ReleasesView } from './components/release/ReleasesView';
 import { Equalizer } from './components/player/Equalizer';
 import { useJobsStore } from './state/jobs';
+import { Tooltip } from './components/ui/Tooltip';
 
 interface CustomCSSProperties extends CSSProperties {
   WebkitAppRegion?: 'drag' | 'no-drag';
@@ -33,7 +35,7 @@ const getMediaType = (path: string): 'audio' | 'video' | 'image' => {
 };
 
 export function App() {
-  const { addToPlaylist, playAtIndex, playlist, status, streamUrl } = useMediaPlayerStore();
+  const { addToPlaylist, playAtIndex, playlist, status, streamUrl, currentSource } = useMediaPlayerStore();
   const { syncJobs, initializeListeners } = useJobsStore();
   const { tabs: pluginTabs, init: initPlugins } = usePluginStore();
   const { init: initProviders } = useProviderStore();
@@ -43,6 +45,7 @@ export function App() {
   const [showImages, setShowImages] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showPlugins, setShowPlugins] = useState(false);
+  const [showYouTube, setShowYouTube] = useState(false);
 
   const [showReleases, setShowReleases] = useState(false);
 
@@ -126,114 +129,132 @@ export function App() {
   return (
     <div className="h-screen w-screen bg-[#030303] text-[#e5e7eb] flex flex-col overflow-hidden font-sans selection:bg-blue-500/30">
       {/* Three.js Background */}
-      <Background3D />
+      {currentSource?.mediaType !== 'video' && <Background3D />}
 
       {/* Title Bar - Draggable */}
       <div className="h-10 w-full glass flex items-center px-4 select-none z-50" style={{ WebkitAppRegion: 'drag' } as CustomCSSProperties}>
         <div className="flex items-center gap-3">
           <div className="relative group/logo">
             <div className="absolute -inset-1 bg-primary-500/20 rounded-full blur opacity-0 group-hover/logo:opacity-100 transition-opacity" />
-            <img 
-              src="http://127.0.0.1:3000/logo" 
-              alt="Ginger Logo" 
+            <img
+              src="http://127.0.0.1:3000/logo"
+              alt="Ginger Logo"
               className="w-5 h-5 object-contain relative z-10"
               style={{ WebkitAppRegion: 'no-drag' } as CustomCSSProperties}
             />
           </div>
           <div className="text-[10px] font-bold text-gray-400 tracking-[0.2em] uppercase">Ginger Media</div>
           {zenMode && (
-              <button 
-                onClick={() => setZenMode(false)}
-                className="ml-4 px-3 py-0.5 bg-primary-600/20 border border-primary-500/30 rounded-full text-[8px] font-black text-primary-400 hover:bg-primary-500 hover:text-white transition-all animate-fade-in"
-                style={{ WebkitAppRegion: 'no-drag' } as CustomCSSProperties}
-              >
-                EXIT ZEN MODE
-              </button>
+            <button
+              onClick={() => setZenMode(false)}
+              className="ml-4 px-3 py-0.5 bg-primary-600/20 border border-primary-500/30 rounded-full text-[8px] font-black text-primary-400 hover:bg-primary-500 hover:text-white transition-all animate-fade-in"
+              style={{ WebkitAppRegion: 'no-drag' } as CustomCSSProperties}
+            >
+              EXIT ZEN MODE
+            </button>
           )}
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as CustomCSSProperties}>
-          <button
-            onClick={() => setShowSearch(!showSearch)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showSearch ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
-            title="Unified Search (Ctrl+F)"
-          >
-            <SearchIcon className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowPlugins(!showPlugins)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showPlugins ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
-            title="Plugins & Extensions"
-          >
-            <Puzzle className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowLibrary(!showLibrary)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showLibrary ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
-            title="Library"
-          >
-            <Music className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowImages(!showImages)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showImages ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
-            title="Image Gallery"
-          >
-            <Disc3 className="w-4 h-4 text-indigo-400" />
-          </button>
-          <button
-            onClick={() => setShowConverter(!showConverter)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showConverter ? 'text-yellow-400 bg-white/5' : 'text-gray-400'}`}
-            title="Audio Extractor"
-          >
-            <Zap className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowJobs(!showJobs)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showJobs ? 'text-blue-400 bg-white/5' : 'text-gray-400'}`}
-            title="Show Jobs"
-          >
-            <Activity className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowReleases(!showReleases)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showReleases ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
-            title="Release Notes"
-          >
-            <FileText className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowNetwork(!showNetwork)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showNetwork ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
-            title="Network Media"
-          >
-            <Wifi className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowQueue(!showQueue)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showQueue ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
-            title="Toggle Queue"
-          >
-            <ListMusic className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setZenMode(!zenMode)}
-            className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${zenMode ? 'text-primary-400 bg-white/5 shadow-glow-sm' : 'text-gray-400'}`}
-            title="Zen Mode (Hide Controls)"
-          >
-            <EyeOff className="w-4 h-4" />
-          </button>
+          <Tooltip content="Unified Search (Ctrl+F)" position="bottom">
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showSearch ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <SearchIcon className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="YouTube" position="bottom">
+            <button
+              onClick={() => setShowYouTube(!showYouTube)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showYouTube ? 'text-red-500 bg-white/5' : 'text-gray-400'}`}
+            >
+              <Youtube className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Plugins & Extensions" position="bottom">
+            <button
+              onClick={() => setShowPlugins(!showPlugins)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showPlugins ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <Puzzle className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Library" position="bottom">
+            <button
+              onClick={() => setShowLibrary(!showLibrary)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showLibrary ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <Music className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Image Gallery" position="bottom">
+            <button
+              onClick={() => setShowImages(!showImages)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showImages ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <Disc3 className="w-4 h-4 text-indigo-400" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Audio Extractor" position="bottom">
+            <button
+              onClick={() => setShowConverter(!showConverter)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showConverter ? 'text-yellow-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <Zap className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Show Jobs" position="bottom">
+            <button
+              onClick={() => setShowJobs(!showJobs)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showJobs ? 'text-blue-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <Activity className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Release Notes" position="bottom">
+            <button
+              onClick={() => setShowReleases(!showReleases)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showReleases ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Network Media" position="bottom">
+            <button
+              onClick={() => setShowNetwork(!showNetwork)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showNetwork ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <Wifi className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Toggle Queue" position="bottom">
+            <button
+              onClick={() => setShowQueue(!showQueue)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showQueue ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <ListMusic className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Zen Mode (Hide Controls)" position="bottom">
+            <button
+              onClick={() => setZenMode(!zenMode)}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${zenMode ? 'text-primary-400 bg-white/5 shadow-glow-sm' : 'text-gray-400'}`}
+            >
+              <EyeOff className="w-4 h-4" />
+            </button>
+          </Tooltip>
 
           {/* Plugin Tabs */}
           {pluginTabs.map(tab => (
-            <button
-               key={tab.id}
-               className="p-1.5 rounded-lg hover:bg-white/10 transition-all text-gray-400"
-               title={`${tab.title} (Plugin)`}
-               onClick={() => console.log(`Opening plugin tab: ${tab.id}`)}
-            >
-               <Puzzle className="w-4 h-4" />
-            </button>
+            <Tooltip key={tab.id} content={`${tab.title} (Plugin)`} position="bottom">
+              <button
+                className="p-1.5 rounded-lg hover:bg-white/10 transition-all text-gray-400"
+                onClick={() => console.log(`Opening plugin tab: ${tab.id}`)}
+              >
+                <Puzzle className="w-4 h-4" />
+              </button>
+            </Tooltip>
           ))}
         </div>
       </div>
@@ -248,6 +269,7 @@ export function App() {
           {showImages && <ImageBrowser onClose={() => setShowImages(false)} />}
           {showConverter && <ConverterView onClose={() => setShowConverter(false)} />}
           {showSearch && <SearchView onClose={() => setShowSearch(false)} />}
+          {showYouTube && <YouTubeView onClose={() => setShowYouTube(false)} />}
           {showPlugins && <PluginSettingsView onClose={() => setShowPlugins(false)} />}
           {showJobs && <JobDashboard onClose={() => setShowJobs(false)} />}
           {showEqualizer && <Equalizer onClose={() => setShowEqualizer(false)} />}
@@ -331,13 +353,13 @@ export function App() {
       {/* Bottom Controls */}
       {!zenMode && (
         <div className="h-28 glass-dark border-t border-white/5 relative z-50 animate-in slide-in-from-bottom duration-500">
-            <div className="max-w-7xl mx-auto h-full flex items-center px-8">
+          <div className="max-w-7xl mx-auto h-full flex items-center px-8">
             <PlayerControls
-                onToggleQueue={() => setShowQueue(!showQueue)}
-                queueVisible={showQueue}
-                onToggleEqualizer={() => setShowEqualizer(!showEqualizer)}
+              onToggleQueue={() => setShowQueue(!showQueue)}
+              queueVisible={showQueue}
+              onToggleEqualizer={() => setShowEqualizer(!showEqualizer)}
             />
-            </div>
+          </div>
         </div>
       )}
     </div>

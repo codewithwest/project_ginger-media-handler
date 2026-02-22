@@ -1,5 +1,5 @@
 
-import { app, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, globalShortcut, session } from 'electron';
 
 // Extend electron App interface
 interface ExtendedApp extends Electron.App {
@@ -19,12 +19,20 @@ import { ReleaseService } from './services/ReleaseService';
 import { SettingsService } from './services/SettingsService';
 import { NetworkManager } from './services/network/NetworkManager';
 import { PluginService } from './services/PluginService';
+import { YouTubeService } from './services/YouTubeService';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
+// Prevent Dev and Prod from sharing the same user data
+const isDev = !app.isPackaged;
+if (isDev) {
+  const devDataPath = path.join(app.getPath('userData'), '..', `${app.getName()}-dev`);
+  app.setPath('userData', devDataPath);
+}
+
 // Single Instance Lock
-const gotTheLock = app.requestSingleInstanceLock();
+const gotTheLock = isDev ? true : app.requestSingleInstanceLock();
 
 let mainWindow: BrowserWindow | null = null;
 let mediaServer: MediaServer | null = null;
@@ -36,6 +44,7 @@ let updateService: UpdateService | null = null;
 let settingsService: SettingsService | null = null;
 let networkManager: NetworkManager | null = null;
 let pluginService: PluginService | null = null;
+let youtubeService: YouTubeService | null = null;
 
 function handleCommandLineArgs(argv: string[]) {
   const args = argv.slice(app.isPackaged ? 1 : 2);
@@ -130,7 +139,7 @@ async function registerIpcHandlers(): Promise<void> {
   playlistService = new PlaylistService();
   pluginService = new PluginService();
   playbackService = new PlaybackService(mainWindow as BrowserWindow, playlistService);
-  
+
   // Broadcast events to plugins
   playbackService.on('state-changed', (state: MediaPlayerState) => {
     pluginService?.broadcastEvent('playback:state-changed', state);
@@ -167,6 +176,7 @@ async function registerIpcHandlers(): Promise<void> {
   jobManager.registerService('conversion', conversionService);
   if (downloadService) {
     jobManager.registerService('download', downloadService);
+    youtubeService = new YouTubeService(downloadService);
   }
 
   // Library Management
@@ -209,7 +219,7 @@ async function registerIpcHandlers(): Promise<void> {
   ipcMain.on('playback:sync-time', (_event, { position }) => {
     const currentState = playbackService?.getState();
     if (currentState?.currentSource?.id) {
-        settingsService?.savePlaybackPosition(currentState.currentSource.id, position);
+      settingsService?.savePlaybackPosition(currentState.currentSource.id, position);
     }
   });
 
@@ -221,12 +231,12 @@ async function registerIpcHandlers(): Promise<void> {
   ipcMain.handle('media:get-stream-url', async (_event, { source }) => {
     if (!mediaServer) throw new Error('Media server not running');
     if (!source || !source.path) {
-        console.warn('[Main] media:get-stream-url called with invalid source:', source);
-        return '';
+      console.warn('[Main] media:get-stream-url called with invalid source:', source);
+      return '';
     }
-    
+
     if (source.type === 'provider' && source.providerId) {
-        return await pluginService?.resolveSource(source) || '';
+      return await pluginService?.resolveSource(source) || '';
     }
 
     const filePath = source.path;
@@ -303,6 +313,11 @@ async function registerIpcHandlers(): Promise<void> {
   // Downloads
   ipcMain.handle('download:get-formats', async () => {
     return [];
+  });
+
+  // YouTube
+  ipcMain.handle('youtube:search', async (_event, query) => {
+    return await youtubeService?.search(query);
   });
 
   // Window controls
@@ -413,7 +428,7 @@ function registerGlobalShortcuts(): void {
   // Listen for signals from Tray or other modules
   // Listen for signals from Tray or other modules using Node EventEmitter
   // properly cast to avoid 'any' if possible, or use specific strings
-  app.on('playback:toggle' as 'activate', () => playbackService?.toggle()); 
+  app.on('playback:toggle' as 'activate', () => playbackService?.toggle());
   app.on('playback:next' as 'activate', () => playbackService?.next());
   app.on('playback:previous' as 'activate', () => playbackService?.previous());
 }
@@ -442,13 +457,26 @@ if (!gotTheLock) {
 
   // Only start the app if we have the lock
   app.on('ready', async () => {
+    // Allow YouTube iframes — inject a CSP that permits frame-src from YouTube
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [
+            "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: http://127.0.0.1:* ws://127.0.0.1:*;" +
+            "frame-src https://www.youtube.com https://www.youtube-nocookie.com;"
+          ]
+        }
+      });
+    });
+
     downloadService = new DownloadService();
     // NetworkManager is created in registerIpcHandlers to attach listeners to mainWindow...
     // But MediaServer needs it. So we should create it here?
     // Or pass it later? MediaServer constructor expects it optional.
     // Ideally we create services in one place.
     // Let's create NetworkManager here.
-    
+
     networkManager = new NetworkManager();
     mediaServer = new MediaServer(
       downloadService.getFFmpegPath(),
