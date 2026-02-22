@@ -19,6 +19,8 @@ import type {
   SMBConfig,
   PluginUITab,
   GingerMediaProvider,
+  PlaylistMetadata,
+  Playlist,
 } from '@shared/types';
 
 // Create type-safe API
@@ -219,6 +221,14 @@ const electronAPI = {
   settings: {
     get: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
     update: (updates: Partial<AppSettings>): Promise<AppSettings> => ipcRenderer.invoke('settings:update', updates),
+  },
+  playlists: {
+    getAll: (): Promise<PlaylistMetadata[]> => ipcRenderer.invoke('playlist:get-all'),
+    get: (id: string): Promise<Playlist | null> => ipcRenderer.invoke('playlist:get', id),
+    create: (name: string): Promise<PlaylistMetadata> => ipcRenderer.invoke('playlist:create', name),
+    saveItems: (id: string, items: MediaSource[]): Promise<void> => ipcRenderer.invoke('playlist:save-items', { id, items }),
+    rename: (id: string, name: string): Promise<boolean> => ipcRenderer.invoke('playlist:rename', { id, name }),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('playlist:delete', id),
   },
 };
 

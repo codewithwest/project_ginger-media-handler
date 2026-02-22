@@ -1,121 +1,124 @@
 
-import { useEffect, useRef } from 'react';
+import { useRef, useMemo } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Stars, Float, ContactShadows } from '@react-three/drei';
+import * as THREE from 'three';
 import { useAudioEngine } from '../../state/audio-engine';
 import { useMediaPlayerStore } from '../../state/media-player';
 
-export function Visualizer() {
-   const canvasRef = useRef<HTMLCanvasElement>(null);
-   const status = useMediaPlayerStore(state => state.status);
-   const animationRef = useRef<number | null>(null);
+function AudioBars() {
+   const barsRef = useRef<THREE.Group>(null);
+   const barCount = 128;
+   const radius = 3;
 
-   useEffect(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+   const barData = useMemo(() => {
+      return Array.from({ length: barCount }, (_, i) => {
+         const angle = (i / barCount) * Math.PI * 2;
+         return {
+            position: [
+               Math.cos(angle) * (radius + 0.2),
+               Math.sin(angle) * (radius + 0.2),
+               0
+            ] as [number, number, number],
+            rotation: [0, 0, angle] as [number, number, number]
+         };
+      });
+   }, []);
 
-      const render = () => {
-         const data = useAudioEngine.getState().getFrequencyData();
-         const width = canvas.width;
-         const height = canvas.height;
-         const centerX = width / 2;
-         const centerY = height / 2;
-         const radius = Math.min(width, height) / 4;
+   useFrame(({ clock }) => {
+      if (!barsRef.current) return;
+      const data = useAudioEngine.getState().getFrequencyData();
+      if (!data || data.length === 0) return;
 
-         ctx.clearRect(0, 0, width, height);
+      barsRef.current.children.forEach((mesh, i) => {
+         if (!(mesh instanceof THREE.Mesh)) return;
 
-         if (!data || data.length === 0) {
-            // Draw a static subtle circle when no data
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(14, 165, 233, 0.1)';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            animationRef.current = requestAnimationFrame(render);
-            return;
-         }
+         const dataIndex = Math.floor((i / barCount) * (data.length / 1.5));
+         const value = data[dataIndex] || 0;
 
-         const barCount = Math.min(data.length, 128); // Limit bars for better circle look
-         const angleStep = (Math.PI * 2) / barCount;
+         const intensity = (value / 255);
+         const targetScale = 0.05 + (intensity * 3.5);
 
-         // Draw outer glow
-         const avgAmplitude = data.reduce((a, b) => a + b, 0) / data.length;
-         const pulse = (avgAmplitude / 255) * 20;
+         mesh.scale.set(1, targetScale, 1);
 
-         const gradientGlow = ctx.createRadialGradient(centerX, centerY, radius, centerX, centerY, radius + 100);
-         gradientGlow.addColorStop(0, 'rgba(14, 165, 233, 0.1)');
-         gradientGlow.addColorStop(1, 'rgba(14, 165, 233, 0)');
-         ctx.fillStyle = gradientGlow;
-         ctx.beginPath();
-         ctx.arc(centerX, centerY, radius + 100 + pulse, 0, Math.PI * 2);
-         ctx.fill();
+         const hue = 0.55 + (intensity * 0.15) + (Math.sin(clock.getElapsedTime() * 0.2) * 0.05);
+         (mesh.material as THREE.MeshStandardMaterial).color.setHSL(hue, 0.8, 0.5);
+         (mesh.material as THREE.MeshStandardMaterial).emissive.setHSL(hue, 0.8, 0.3);
+         (mesh.material as THREE.MeshStandardMaterial).emissiveIntensity = intensity * 3;
+      });
 
-         for (let i = 0; i < barCount; i++) {
-            const value = data[i];
-            const barHeight = (value / 255) * radius * 1.5;
-            const angle = i * angleStep;
-
-            const xStart = centerX + Math.cos(angle) * (radius + 2);
-            const yStart = centerY + Math.sin(angle) * (radius + 2);
-            const xEnd = centerX + Math.cos(angle) * (radius + barHeight + 2);
-            const yEnd = centerY + Math.sin(angle) * (radius + barHeight + 2);
-
-            // Gradient for bars
-            const gradient = ctx.createLinearGradient(xStart, yStart, xEnd, yEnd);
-            gradient.addColorStop(0, '#0ea5e9');
-            gradient.addColorStop(0.5, '#6366f1');
-            gradient.addColorStop(1, 'rgba(99, 102, 241, 0.2)');
-
-            ctx.strokeStyle = gradient;
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-
-            ctx.beginPath();
-            ctx.moveTo(xStart, yStart);
-            ctx.lineTo(xEnd, yEnd);
-            ctx.stroke();
-
-            // Optional: Dot at the end of each bar for extra detail
-            ctx.beginPath();
-            ctx.arc(xEnd, yEnd, 1.5, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
-         }
-
-         // Inner circle "3D" effect
-         const innerGradient = ctx.createRadialGradient(centerX - 10, centerY - 10, 5, centerX, centerY, radius);
-         innerGradient.addColorStop(0, '#1e293b');
-         innerGradient.addColorStop(1, '#0f172a');
-
-         ctx.fillStyle = innerGradient;
-         ctx.beginPath();
-         ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-         ctx.fill();
-
-         ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-         ctx.lineWidth = 2;
-         ctx.stroke();
-
-         animationRef.current = requestAnimationFrame(render);
-      };
-
-      if (status === 'playing') {
-         animationRef.current = requestAnimationFrame(render);
-      } else {
-         if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      }
-
-      return () => {
-         if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      };
-   }, [status]);
+      barsRef.current.rotation.z += 0.002;
+      barsRef.current.rotation.y = Math.sin(clock.getElapsedTime() * 0.5) * 0.1;
+   });
 
    return (
-      <canvas
-         ref={canvasRef}
-         className="w-[500px] h-[500px] pointer-events-none"
-         width={1000}
-         height={1000}
-      />
+      <group ref={barsRef}>
+         {barData.map((data, i) => (
+            <mesh key={i} position={data.position} rotation={data.rotation}>
+               <boxGeometry args={[0.04, 1, 0.1]} />
+               <meshStandardMaterial
+                  color="#0ea5e9"
+                  emissive="#0ea5e9"
+                  emissiveIntensity={1}
+                  toneMapped={false}
+               />
+            </mesh>
+         ))}
+      </group>
+   );
+}
+
+function CentralSphere() {
+   const meshRef = useRef<THREE.Mesh>(null);
+
+   useFrame(() => {
+      if (!meshRef.current) return;
+      const data = useAudioEngine.getState().getFrequencyData();
+      const avg = data.length > 0 ? data.reduce((a, b) => a + b, 0) / data.length : 0;
+      const pulse = 1 + (avg / 255) * 0.2;
+      meshRef.current.scale.set(pulse, pulse, pulse);
+      meshRef.current.rotation.y += 0.01;
+      meshRef.current.rotation.x += 0.005;
+   });
+
+   return (
+      <mesh ref={meshRef}>
+         <sphereGeometry args={[2.5, 32, 32]} />
+         <meshStandardMaterial
+            color="#0f172a"
+            roughness={0}
+            metalness={1}
+            transparent
+            opacity={0.9}
+            emissive="#0a0a0a"
+         />
+      </mesh>
+   );
+}
+
+export function Visualizer() {
+   const status = useMediaPlayerStore(state => state.status);
+
+   if (status !== 'playing') return null;
+
+   return (
+      <div className="w-[600px] h-[600px] pointer-events-none relative flex items-center justify-center">
+         {/* Background radial glow */}
+         <div className="absolute inset-0 bg-radial-gradient from-primary-500/10 to-transparent blur-3xl rounded-full scale-150 animate-pulse duration-[3000ms]" />
+
+         <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
+            <ambientLight intensity={0.5} />
+            <pointLight position={[10, 10, 10]} intensity={1.5} color="#0ea5e9" />
+            <pointLight position={[-10, -10, -10]} intensity={0.5} color="#6366f1" />
+
+            <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
+               <AudioBars />
+               <CentralSphere />
+            </Float>
+
+            <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+            <ContactShadows position={[0, -4.5, 0]} opacity={0.4} scale={20} blur={24} far={4.5} />
+         </Canvas>
+      </div>
    );
 }

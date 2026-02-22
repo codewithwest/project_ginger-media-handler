@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useMediaPlayerStore } from '../../state/media-player';
-import { Play, Trash2, ListMusic, Plus, Download, Folder } from 'lucide-react';
-import type { PlaylistItem } from '@shared/types';
+import { usePlaylistStore } from '../../state/playlists';
+import { Trash2, ListMusic, Plus, Download, Bookmark, Edit2, Check, Save } from 'lucide-react';
+import type { MediaSource, PlaylistMetadata } from '../../../shared/types/media';
 
 export function PlaylistSidebar() {
   const {
@@ -14,9 +15,24 @@ export function PlaylistSidebar() {
     addToPlaylist
   } = useMediaPlayerStore();
 
+  const {
+    playlists,
+    fetchPlaylists,
+    createPlaylist,
+    renamePlaylist,
+    deletePlaylist,
+    loadPlaylist,
+    updateItems,
+  } = usePlaylistStore();
+
+  const [view, setView] = useState<'queue' | 'library'>('queue');
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [downloadsPath, setDownloadsPath] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [showCreateInput, setShowCreateInput] = useState(false);
 
   useEffect(() => {
     window.electronAPI.settings.get().then(settings => {
@@ -24,26 +40,20 @@ export function PlaylistSidebar() {
         setDownloadsPath(settings.downloadsPath);
       }
     });
-  }, []);
+    fetchPlaylists();
+  }, [fetchPlaylists]);
 
   const handleAddFiles = async () => {
     const files = await window.electronAPI.file.openDialog();
     if (files && files.length > 0) {
-      const newItems: PlaylistItem[] = files.map((filePath: string) => ({
+      const newItems: MediaSource[] = files.map((filePath: string) => ({
         id: filePath,
         type: 'local' as const,
+        mediaType: 'audio', // Default
         path: filePath,
-        title: typeof filePath === 'string' ? filePath.split('/').pop() || 'Unknown' : 'Unknown'
+        title: filePath.split('/').pop() || 'Unknown'
       }));
-      newItems.forEach((item: PlaylistItem) => addToPlaylist(item));
-    }
-  };
-
-  const handleChangeFolder = async () => {
-    const newPath = await window.electronAPI.library.pickFolder();
-    if (newPath) {
-      setDownloadsPath(newPath);
-      window.electronAPI.settings.update({ downloadsPath: newPath });
+      newItems.forEach((item: MediaSource) => addToPlaylist(item));
     }
   };
 
@@ -63,64 +73,142 @@ export function PlaylistSidebar() {
     }
   };
 
-  const toggleUrlInput = () => {
-    setShowUrlInput(!showUrlInput);
-    if (!showUrlInput) {
-      setTimeout(() => document.getElementById('url-input')?.focus(), 50);
+  const startRename = (playlist: PlaylistMetadata) => {
+    setEditingId(playlist.id);
+    setEditName(playlist.name);
+  };
+
+  const confirmRename = async (id: string) => {
+    if (editName.trim()) {
+      await renamePlaylist(id, editName.trim());
+      setEditingId(null);
     }
   };
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return '--:--';
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  const handleCreatePlaylist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPlaylistName.trim()) {
+      await createPlaylist(newPlaylistName.trim());
+      setNewPlaylistName('');
+      setShowCreateInput(false);
+    }
+  };
+
+  const handleSaveCurrentQueue = async () => {
+    const name = `Quick Playlist ${playlists.length + 1}`;
+    await createPlaylist(name);
+    // Find the latest one (by name or just re-fetch and get last)
+    const latest = await window.electronAPI.playlists.getAll();
+    const newId = latest.find(p => p.name === name)?.id;
+    if (newId) {
+      await updateItems(newId, playlist);
+    }
+  };
+
+  const handleLoadPlaylist = async (id: string) => {
+    await loadPlaylist(id);
+    // In actual implementation, you might want to ask if they want to append or replace
+    const saved = await window.electronAPI.playlists.get(id);
+    if (saved) {
+      clearPlaylist();
+      saved.items.forEach(item => addToPlaylist(item));
+      playAtIndex(0);
+      setView('queue');
+    }
   };
 
   return (
     <div className="h-full flex flex-col animate-fade-in">
+      {/* Tab Switcher */}
+      <div className="px-6 pt-6 flex gap-4 border-b border-white/5 pb-4">
+        <button
+          onClick={() => setView('queue')}
+          className={`text-xs font-black uppercase tracking-widest transition-colors ${view === 'queue' ? 'text-primary-500' : 'text-gray-500 hover:text-white'}`}
+        >
+          Queue
+        </button>
+        <button
+          onClick={() => setView('library')}
+          className={`text-xs font-black uppercase tracking-widest transition-colors ${view === 'library' ? 'text-primary-500' : 'text-gray-500 hover:text-white'}`}
+        >
+          Library
+        </button>
+      </div>
+
       <div className="p-6 flex flex-col gap-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-              Queue
+              {view === 'queue' ? 'Playing Next' : 'Your Playlists'}
             </h2>
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">
-              {playlist.length} {playlist.length === 1 ? 'Track' : 'Tracks'}
-            </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={toggleUrlInput}
-              className={`p-2 rounded-xl transition-all duration-300 ${showUrlInput ? 'bg-primary-500 text-white shadow-glow' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-              title="Download from URL"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleAddFiles}
-              className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-300"
-              title="Add Files"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            <button
-              onClick={clearPlaylist}
-              className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-300"
-              title="Clear Queue"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {view === 'queue' ? (
+              <>
+                <button
+                  onClick={handleSaveCurrentQueue}
+                  className="p-2 text-gray-400 hover:text-primary-400 hover:bg-white/5 rounded-xl transition-all duration-300"
+                  title="Save Queue as Playlist"
+                >
+                  <Save className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setShowUrlInput(!showUrlInput)}
+                  className={`p-2 rounded-xl transition-all duration-300 ${showUrlInput ? 'bg-primary-500 text-white shadow-glow' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                  title="Download from URL"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleAddFiles}
+                  className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-300"
+                  title="Add Files"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={clearPlaylist}
+                  className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-300"
+                  title="Clear Queue"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setShowCreateInput(!showCreateInput)}
+                className={`p-2 rounded-xl transition-all duration-300 ${showCreateInput ? 'bg-primary-500 text-white shadow-glow' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                title="Create New Playlist"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
+        {/* Create Input */}
+        {showCreateInput && (
+          <form onSubmit={handleCreatePlaylist} className="flex gap-2 animate-in slide-in-from-top-2 duration-300">
+            <input
+              autoFocus
+              type="text"
+              value={newPlaylistName}
+              onChange={(e) => setNewPlaylistName(e.target.value)}
+              placeholder="Playlist name..."
+              className="flex-1 bg-white/5 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-primary-500/50"
+            />
+            <button type="submit" className="p-2 bg-primary-600 rounded-xl text-white"><Check className="w-4 h-4" /></button>
+          </form>
+        )}
+
         {/* URL Input Form */}
-        {showUrlInput && (
+        {view === 'queue' && showUrlInput && (
           <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 duration-300 p-4 rounded-2xl bg-white/5 border border-white/5">
             <form onSubmit={handleDownloadSubmit} className="flex gap-2">
               <input
                 id="url-input"
                 type="text"
+                autoFocus
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="Paste Media URL..."
@@ -133,89 +221,102 @@ export function PlaylistSidebar() {
                 Go
               </button>
             </form>
-            <div className="flex items-center gap-2 text-[10px] text-gray-500">
-              <Folder className="w-3 h-3 text-primary-500" />
-              <span className="truncate flex-1" title={downloadsPath}>{downloadsPath.split('/').pop() || 'Downloads'}</span>
-              <button
-                onClick={handleChangeFolder}
-                className="text-primary-500 hover:text-primary-400 transition-colors font-bold"
-                type="button"
-              >
-                Change
-              </button>
-            </div>
           </div>
         )}
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-6 space-y-1">
-        {playlist.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8 animate-fade-in">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-              <ListMusic className="w-8 h-8 text-gray-600" />
+        {view === 'queue' ? (
+          playlist.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8">
+              <ListMusic className="w-8 h-8 text-gray-600 mb-4" />
+              <p className="text-gray-500 text-sm font-medium">Your queue is empty</p>
             </div>
-            <p className="text-gray-500 text-sm font-medium">Your queue is empty</p>
-            <p className="text-gray-600 text-xs mt-1">Add tracks to start listening</p>
-          </div>
-        ) : (
-          playlist.map((item, index) => {
-            const isActive = index === currentIndex;
-            return (
+          ) : (
+            playlist.map((item, index) => (
               <div
                 key={index}
-                className={`
-                  group relative flex items-center gap-4 p-3 rounded-2xl cursor-pointer transition-all duration-300
-                  ${isActive
-                    ? 'bg-white/10 border-white/10 shadow-xl scale-[1.02] z-10'
-                    : 'hover:bg-white/5 hover:translate-x-1 border-transparent'
-                  }
-                  border
-                `}
+                className={`group flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all ${index === currentIndex ? 'bg-white/10' : ''}`}
                 onDoubleClick={() => playAtIndex(index)}
               >
-                {/* Visual Indicator */}
-                <div className="w-8 h-8 rounded-xl bg-black/40 flex items-center justify-center flex-shrink-0">
-                  {isActive ? (
-                    <div className="flex gap-0.5 items-end h-3">
-                      <span className="w-0.5 bg-primary-500 animate-[music-bar_0.8s_ease-in-out_infinite]" style={{ animationDelay: '0s' }} />
-                      <span className="w-0.5 bg-primary-500 animate-[music-bar_0.8s_ease-in-out_infinite]" style={{ animationDelay: '0.2s', height: '60%' }} />
-                      <span className="w-0.5 bg-primary-500 animate-[music-bar_0.8s_ease-in-out_infinite]" style={{ animationDelay: '0.4s' }} />
+                <div className="w-8 h-8 rounded-lg bg-black/40 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                  {index === currentIndex ? (
+                    <div className="flex gap-0.5 items-end h-2">
+                      <div className="w-0.5 bg-primary-500 animate-[music-bar_0.8s_ease-in-out_infinite]" />
+                      <div className="w-0.5 bg-primary-500 animate-[music-bar_0.8s_ease-in-out_infinite_0.2s] h-[60%]" />
+                      <div className="w-0.5 bg-primary-500 animate-[music-bar_0.8s_ease-in-out_infinite_0.4s]" />
+                    </div>
+                  ) : index + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-xs font-bold truncate ${index === currentIndex ? 'text-primary-400' : 'text-gray-300'}`}>
+                    {item.title}
+                  </div>
+                  <div className="text-[10px] text-gray-600 truncate">{item.artist || 'Unknown'}</div>
+                </div>
+                <button
+                  onClick={() => removeFromPlaylist(index)}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))
+          )
+        ) : (
+          playlists.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8">
+              <Bookmark className="w-8 h-8 text-gray-600 mb-4" />
+              <p className="text-gray-500 text-sm font-medium">No saved playlists</p>
+            </div>
+          ) : (
+            playlists.map((p) => (
+              <div key={p.id} className="group flex flex-col p-3 rounded-2xl bg-white/5 hover:bg-white/10 transition-all gap-2 border border-transparent hover:border-white/5">
+                <div className="flex items-center justify-between">
+                  {editingId === p.id ? (
+                    <div className="flex-1 flex gap-2">
+                      <input
+                        autoFocus
+                        className="flex-1 bg-black/40 border-none rounded-lg px-2 py-1 text-xs text-white"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onBlur={() => confirmRename(p.id)}
+                        onKeyDown={(e) => e.key === 'Enter' && confirmRename(p.id)}
+                      />
                     </div>
                   ) : (
-                    <span className="text-[10px] font-bold text-gray-600 group-hover:hidden font-mono">{index + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-black text-white truncate uppercase tracking-tighter">{p.name}</div>
+                      <div className="text-[9px] text-gray-500 uppercase font-mono">{p.itemCount} items</div>
+                    </div>
                   )}
-                  <Play className={`w-3 h-3 text-white hidden group-hover:block ${isActive ? 'hidden' : ''} fill-current`} />
+
+                  <div className="flex items-center gap-1">
+                    {editingId !== p.id && (
+                      <button onClick={() => startRename(p)} className="p-1.5 text-gray-500 hover:text-white transition-colors" title="Rename"><Edit2 className="w-3 h-3" /></button>
+                    )}
+                    <button onClick={() => deletePlaylist(p.id)} className="p-1.5 text-gray-500 hover:text-red-400 transition-colors" title="Delete"><Trash2 className="w-3 h-3" /></button>
+                  </div>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold truncate ${isActive ? 'text-primary-400' : 'text-gray-300 group-hover:text-white'}`}>
-                    {item.title || item.path?.split('/').pop() || 'Unknown Track'}
-                  </p>
-                  <p className="text-[10px] text-gray-500 group-hover:text-gray-400 truncate uppercase tracking-wider font-medium">
-                    {item.artist || 'Unknown Artist'}
-                  </p>
-                </div>
-
-                {/* Duration / Delete */}
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[10px] font-mono text-gray-600 group-hover:hidden">
-                    {formatDuration(item.duration)}
-                  </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFromPlaylist(index);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleLoadPlaylist(p.id)}
+                  className="w-full py-2 bg-primary-600/20 hover:bg-primary-500 text-primary-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                >
+                  Load Playlist
+                </button>
               </div>
-            );
-          })
+            ))
+          )
         )}
       </div>
+
+      <style>{`
+        @keyframes music-bar {
+          0%, 100% { height: 30%; }
+          50% { height: 100%; }
+        }
+      `}</style>
     </div>
   );
 }

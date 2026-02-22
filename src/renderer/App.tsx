@@ -5,7 +5,18 @@ import { useEffect, useState, CSSProperties } from 'react';
 import { Background3D } from './components/3d/Background3D';
 import { PlayerControls } from './components/player/PlayerControls';
 import { useMediaPlayerStore } from './state/media-player';
-import { Disc3, FolderOpen, Activity, Music, FileText, ListMusic, Wifi, Puzzle, Zap, Search as SearchIcon, EyeOff, Youtube } from 'lucide-react';
+import {
+  Disc3,
+  Activity,
+  Music,
+  FileText,
+  Wifi,
+  Puzzle,
+  Search as SearchIcon,
+  Youtube,
+  Image as ImageIcon,
+  FolderOpen
+} from 'lucide-react';
 import { NetworkView } from './components/network/NetworkView';
 import { ConverterView } from './components/converter/ConverterView';
 import { ImageBrowser } from './components/library/ImageBrowser';
@@ -22,6 +33,9 @@ import { ReleasesView } from './components/release/ReleasesView';
 import { Equalizer } from './components/player/Equalizer';
 import { useJobsStore } from './state/jobs';
 import { Tooltip } from './components/ui/Tooltip';
+import { SplashScreen } from './components/ui/SplashScreen';
+
+type Tab = 'player' | 'gallery' | 'library' | 'youtube' | 'network' | 'converter' | 'jobs' | 'plugins' | 'releases' | 'search';
 
 interface CustomCSSProperties extends CSSProperties {
   WebkitAppRegion?: 'drag' | 'no-drag';
@@ -39,17 +53,10 @@ export function App() {
   const { syncJobs, initializeListeners } = useJobsStore();
   const { tabs: pluginTabs, init: initPlugins } = usePluginStore();
   const { init: initProviders } = useProviderStore();
-  const [showJobs, setShowJobs] = useState(false);
-  const [showLibrary, setShowLibrary] = useState(false);
-  const [showConverter, setShowConverter] = useState(false);
-  const [showImages, setShowImages] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [showPlugins, setShowPlugins] = useState(false);
-  const [showYouTube, setShowYouTube] = useState(false);
 
-  const [showReleases, setShowReleases] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>('player');
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  const [showNetwork, setShowNetwork] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showQueue, setShowQueue] = useState(true);
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -144,6 +151,16 @@ export function App() {
             />
           </div>
           <div className="text-[10px] font-bold text-gray-400 tracking-[0.2em] uppercase">Ginger Media</div>
+          <div className="flex items-center gap-1 ml-4" style={{ WebkitAppRegion: 'no-drag' } as CustomCSSProperties}>
+            <Tooltip content="Image Gallery" position="bottom">
+              <button
+                onClick={() => setActiveTab('gallery')}
+                className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${activeTab === 'gallery' ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
+              >
+                <ImageIcon className="w-5 h-5" />
+              </button>
+            </Tooltip>
+          </div>
           {zenMode && (
             <button
               onClick={() => setZenMode(false)}
@@ -156,92 +173,60 @@ export function App() {
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as CustomCSSProperties}>
-          <Tooltip content="Unified Search (Ctrl+F)" position="bottom">
+          <Tooltip content="Library" position="bottom">
             <button
-              onClick={() => setShowSearch(!showSearch)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showSearch ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
+              onClick={() => setActiveTab('library')}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${activeTab === 'library' ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
             >
-              <SearchIcon className="w-4 h-4" />
+              <Music className="w-5 h-5" />
             </button>
           </Tooltip>
           <Tooltip content="YouTube" position="bottom">
             <button
-              onClick={() => setShowYouTube(!showYouTube)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showYouTube ? 'text-red-500 bg-white/5' : 'text-gray-400'}`}
+              onClick={() => setActiveTab('youtube')}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${activeTab === 'youtube' ? 'text-red-500 bg-white/5' : 'text-gray-400'}`}
             >
-              <Youtube className="w-4 h-4" />
+              <Youtube className="w-5 h-5" />
             </button>
           </Tooltip>
-          <Tooltip content="Plugins & Extensions" position="bottom">
+          <Tooltip content="Unified Search (Ctrl+F)" position="bottom">
             <button
-              onClick={() => setShowPlugins(!showPlugins)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showPlugins ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
+              onClick={() => setActiveTab('search')}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${activeTab === 'search' ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
             >
-              <Puzzle className="w-4 h-4" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Library" position="bottom">
-            <button
-              onClick={() => setShowLibrary(!showLibrary)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showLibrary ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
-            >
-              <Music className="w-4 h-4" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Image Gallery" position="bottom">
-            <button
-              onClick={() => setShowImages(!showImages)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showImages ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
-            >
-              <Disc3 className="w-4 h-4 text-indigo-400" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Audio Extractor" position="bottom">
-            <button
-              onClick={() => setShowConverter(!showConverter)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showConverter ? 'text-yellow-400 bg-white/5' : 'text-gray-400'}`}
-            >
-              <Zap className="w-4 h-4" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Show Jobs" position="bottom">
-            <button
-              onClick={() => setShowJobs(!showJobs)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showJobs ? 'text-blue-400 bg-white/5' : 'text-gray-400'}`}
-            >
-              <Activity className="w-4 h-4" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Release Notes" position="bottom">
-            <button
-              onClick={() => setShowReleases(!showReleases)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showReleases ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
-            >
-              <FileText className="w-4 h-4" />
+              <SearchIcon className="w-5 h-5" />
             </button>
           </Tooltip>
           <Tooltip content="Network Media" position="bottom">
             <button
-              onClick={() => setShowNetwork(!showNetwork)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showNetwork ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
+              onClick={() => setActiveTab('network')}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${activeTab === 'network' ? 'text-primary-400 bg-white/5' : 'text-gray-400'}`}
             >
-              <Wifi className="w-4 h-4" />
+              <Wifi className="w-5 h-5" />
             </button>
           </Tooltip>
-          <Tooltip content="Toggle Queue" position="bottom">
+          <Tooltip content="Plugins & Extensions" position="bottom">
             <button
-              onClick={() => setShowQueue(!showQueue)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${showQueue ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
+              onClick={() => setActiveTab('plugins')}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${activeTab === 'plugins' ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
             >
-              <ListMusic className="w-4 h-4" />
+              <Puzzle className="w-5 h-5" />
             </button>
           </Tooltip>
-          <Tooltip content="Zen Mode (Hide Controls)" position="bottom">
+          <Tooltip content="Show Jobs" position="bottom">
             <button
-              onClick={() => setZenMode(!zenMode)}
-              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${zenMode ? 'text-primary-400 bg-white/5 shadow-glow-sm' : 'text-gray-400'}`}
+              onClick={() => setActiveTab('jobs')}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${activeTab === 'jobs' ? 'text-blue-400 bg-white/5' : 'text-gray-400'}`}
             >
-              <EyeOff className="w-4 h-4" />
+              <Activity className="w-5 h-5" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Release Notes" position="bottom">
+            <button
+              onClick={() => setActiveTab('releases')}
+              className={`p-1.5 rounded-lg hover:bg-white/10 transition-all ${activeTab === 'releases' ? 'text-indigo-400 bg-white/5' : 'text-gray-400'}`}
+            >
+              <FileText className="w-5 h-5" />
             </button>
           </Tooltip>
 
@@ -262,51 +247,59 @@ export function App() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col relative overflow-hidden">
-          {/* Overlays */}
-          {showLibrary && <LibraryView onClose={() => setShowLibrary(false)} />}
-          {showReleases && <ReleasesView onClose={() => setShowReleases(false)} />}
-          {showNetwork && <NetworkView onClose={() => setShowNetwork(false)} />}
-          {showImages && <ImageBrowser onClose={() => setShowImages(false)} />}
-          {showConverter && <ConverterView onClose={() => setShowConverter(false)} />}
-          {showSearch && <SearchView onClose={() => setShowSearch(false)} />}
-          {showYouTube && <YouTubeView onClose={() => setShowYouTube(false)} />}
-          {showPlugins && <PluginSettingsView onClose={() => setShowPlugins(false)} />}
-          {showJobs && <JobDashboard onClose={() => setShowJobs(false)} />}
+          {isInitializing && <SplashScreen onComplete={() => setIsInitializing(false)} />}
+
+          {/* Overlays / Sidebars */}
           {showEqualizer && <Equalizer onClose={() => setShowEqualizer(false)} />}
 
-          {/* Main Stage (Player) */}
-          <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-            {streamUrl ? (
-              <div className="w-full h-full animate-fade-in relative">
-                <VideoPlayer key={streamUrl} />
-              </div>
-            ) : (
-              /* Premium Placeholder */
-              <div className="flex flex-col items-center gap-8 mb-12 z-10 animate-fade-in">
-                <div className="relative group">
-                  <div className="absolute -inset-4 bg-primary-500/20 rounded-full blur-2xl group-hover:bg-primary-500/30 transition-all duration-500" />
-                  <div className="w-56 h-56 rounded-3xl glass flex items-center justify-center shadow-2xl relative">
-                    <Disc3 className="w-28 h-28 text-primary-500 animate-spin-slow" />
-                  </div>
-                </div>
+          {/* View Container */}
+          <div className="flex-1 relative overflow-hidden">
+            {activeTab === 'library' && <LibraryView onClose={() => setActiveTab('player')} />}
+            {activeTab === 'releases' && <ReleasesView onClose={() => setActiveTab('player')} />}
+            {activeTab === 'network' && <NetworkView onClose={() => setActiveTab('player')} />}
+            {activeTab === 'gallery' && <ImageBrowser onClose={() => setActiveTab('player')} />}
+            {activeTab === 'converter' && <ConverterView onClose={() => setActiveTab('player')} />}
+            {activeTab === 'search' && <SearchView onClose={() => setActiveTab('player')} />}
+            {activeTab === 'youtube' && <YouTubeView onClose={() => setActiveTab('player')} />}
+            {activeTab === 'plugins' && <PluginSettingsView onClose={() => setActiveTab('player')} />}
+            {activeTab === 'jobs' && <JobDashboard onClose={() => setActiveTab('player')} />}
 
-                <div className="text-center space-y-2">
-                  <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
-                    Ready for Music?
-                  </h2>
-                  <p className="text-gray-500 text-sm max-w-[240px] mx-auto leading-relaxed">
-                    Select a track from your library or drop files here to begin your experience.
-                  </p>
-                  <div className="pt-6">
-                    <button
-                      onClick={handleOpenFiles}
-                      className="group flex items-center gap-3 px-6 py-3 bg-primary-600 hover:bg-primary-500 rounded-2xl text-sm font-semibold text-white transition-all duration-300 shadow-lg shadow-primary-900/40 hover:scale-105 active:scale-95"
-                    >
-                      <FolderOpen className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                      <span>Open Media</span>
-                    </button>
+            {/* Main Stage (Player) */}
+            {activeTab === 'player' && (
+              <div className="flex-1 h-full relative flex items-center justify-center overflow-hidden">
+                {streamUrl ? (
+                  <div className="w-full h-full animate-fade-in relative">
+                    <VideoPlayer key={streamUrl} />
                   </div>
-                </div>
+                ) : (
+                  /* Premium Placeholder */
+                  <div className="flex flex-col items-center gap-8 mb-12 z-10 animate-fade-in">
+                    <div className="relative group">
+                      <div className="absolute -inset-4 bg-primary-500/20 rounded-full blur-2xl group-hover:bg-primary-500/30 transition-all duration-500" />
+                      <div className="w-56 h-56 rounded-3xl glass flex items-center justify-center shadow-2xl relative">
+                        <Disc3 className="w-28 h-28 text-primary-500 animate-spin-slow" />
+                      </div>
+                    </div>
+
+                    <div className="text-center space-y-2">
+                      <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
+                        Ready for Music?
+                      </h2>
+                      <p className="text-gray-500 text-sm max-w-[240px] mx-auto leading-relaxed">
+                        Select a track from your library or drop files here to begin your experience.
+                      </p>
+                      <div className="pt-6">
+                        <button
+                          onClick={handleOpenFiles}
+                          className="group flex items-center gap-3 px-6 py-3 bg-primary-600 hover:bg-primary-500 rounded-2xl text-sm font-semibold text-white transition-all duration-300 shadow-lg shadow-primary-900/40 hover:scale-105 active:scale-95"
+                        >
+                          <FolderOpen className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                          <span>Open Media</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -336,42 +329,46 @@ export function App() {
       </div>
 
       {/* Update Notification */}
-      {updateAvailable && (
-        <div className="absolute bottom-28 right-8 glass-dark p-1 rounded-2xl shadow-2xl z-[60] animate-fade-in">
-          <div className="bg-primary-600/10 p-4 rounded-xl border border-primary-500/20 flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-500 rounded-lg">
-                <Activity className="w-5 h-5 text-white" />
+      {
+        updateAvailable && (
+          <div className="absolute bottom-28 right-8 glass-dark p-1 rounded-2xl shadow-2xl z-[60] animate-fade-in">
+            <div className="bg-primary-600/10 p-4 rounded-xl border border-primary-500/20 flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary-500 rounded-lg">
+                  <Activity className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm">New Update Ready</div>
+                  <div className="text-[10px] text-gray-400">Downloading the latest improvements...</div>
+                </div>
               </div>
-              <div>
-                <div className="font-bold text-sm">New Update Ready</div>
-                <div className="text-[10px] text-gray-400">Downloading the latest improvements...</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setUpdateAvailable(false)}
+                  className="flex-1 text-[10px] font-bold text-gray-400 hover:text-white transition-colors"
+                >
+                  Dismiss
+                </button>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setUpdateAvailable(false)}
-                className="flex-1 text-[10px] font-bold text-gray-400 hover:text-white transition-colors"
-              >
-                Dismiss
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Bottom Controls */}
-      {!zenMode && (
-        <div className="h-28 glass-dark border-t border-white/5 relative z-50 animate-in slide-in-from-bottom duration-500">
-          <div className="max-w-7xl mx-auto h-full flex items-center px-8">
-            <PlayerControls
-              onToggleQueue={() => setShowQueue(!showQueue)}
-              queueVisible={showQueue}
-              onToggleEqualizer={() => setShowEqualizer(!showEqualizer)}
-            />
+      {
+        !zenMode && (
+          <div className="h-28 glass-dark border-t border-white/5 relative z-50 animate-in slide-in-from-bottom duration-500">
+            <div className="max-w-7xl mx-auto h-full flex items-center px-8">
+              <PlayerControls
+                onToggleQueue={() => setShowQueue(!showQueue)}
+                queueVisible={showQueue}
+                onToggleEqualizer={() => setShowEqualizer(!showEqualizer)}
+              />
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }

@@ -1,4 +1,4 @@
-import { Play, Pause, SkipForward, SkipBack, Shuffle, Repeat, Volume2, Maximize, ListMusic, SlidersHorizontal, Gauge } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Shuffle, Repeat, Volume2, Maximize, ListMusic, SlidersHorizontal, Gauge, EyeOff } from 'lucide-react';
 import { useMediaPlayerStore } from '../../state/media-player';
 import { Tooltip } from '../ui/Tooltip';
 
@@ -6,9 +6,17 @@ interface PlayerControlsProps {
   onToggleQueue?: () => void;
   queueVisible?: boolean;
   onToggleEqualizer?: () => void;
+  zenMode?: boolean;
+  onToggleZenMode?: () => void;
 }
 
-export function PlayerControls({ onToggleQueue, queueVisible, onToggleEqualizer }: PlayerControlsProps) {
+export function PlayerControls({
+  onToggleQueue,
+  queueVisible,
+  onToggleEqualizer,
+  zenMode,
+  onToggleZenMode
+}: PlayerControlsProps) {
   const {
     status,
     shuffle,
@@ -31,13 +39,14 @@ export function PlayerControls({ onToggleQueue, queueVisible, onToggleEqualizer 
   const isPlaying = status === 'playing';
 
   const formatTime = (seconds: number) => {
+    if (!seconds || !isFinite(seconds) || isNaN(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPosition = parseFloat(e.target.value);
+    const newPosition = parseFloat(e.target.value) || 0;
     seek(newPosition);
   };
 
@@ -57,7 +66,7 @@ export function PlayerControls({ onToggleQueue, queueVisible, onToggleEqualizer 
     <div className="flex flex-col gap-2 w-full animate-fade-in">
       {/* Progress Bar */}
       <div className="flex items-center gap-4 w-full px-2">
-        <span className="text-[10px] text-gray-500 w-10 text-right font-mono tabular-nums">
+        <span className="text-[10px] text-gray-500 w-[38px] text-right font-mono tabular-nums shrink-0">
           {formatTime(position)}
         </span>
         <div className="flex-1 relative group h-6 flex items-center">
@@ -77,15 +86,14 @@ export function PlayerControls({ onToggleQueue, queueVisible, onToggleEqualizer 
               group-hover:[&::-webkit-slider-thumb]:h-3
               group-hover:[&::-webkit-slider-thumb]:bg-white
               group-hover:[&::-webkit-slider-thumb]:rounded-full
-              group-hover:[&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(255,255,255,0.5)]
-              transition-all duration-200"
+              group-hover:[&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(255,255,255,0.5)]"
           />
           <div
             className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary-500 rounded-full pointer-events-none"
             style={{ width: `${(position / (duration || 100)) * 100}%` }}
           />
         </div>
-        <span className="text-[10px] text-gray-500 w-10 font-mono tabular-nums">
+        <span className="text-[10px] text-gray-500 w-[38px] font-mono tabular-nums shrink-0">
           {formatTime(duration)}
         </span>
       </div>
@@ -206,6 +214,15 @@ export function PlayerControls({ onToggleQueue, queueVisible, onToggleEqualizer 
               className={`p-2 rounded-xl transition-all ${queueVisible ? 'text-primary-500 bg-primary-500/10 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
             >
               <ListMusic className="w-4 h-4" />
+            </button>
+          </Tooltip>
+
+          <Tooltip content="Zen Mode (Hide Controls)" position="top">
+            <button
+              onClick={onToggleZenMode}
+              className={`p-2 rounded-xl transition-all ${zenMode ? 'text-primary-500 bg-primary-500/10 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}
+            >
+              <EyeOff className="w-4 h-4" />
             </button>
           </Tooltip>
         </div>

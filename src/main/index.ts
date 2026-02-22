@@ -215,6 +215,31 @@ async function registerIpcHandlers(): Promise<void> {
     return await libraryService?.renameTrack(id, newName);
   });
 
+  // Playlist Management
+  ipcMain.handle('playlist:get-all', async () => {
+    return playlistService?.getAllPlaylists() || [];
+  });
+
+  ipcMain.handle('playlist:get', async (_event, id) => {
+    return playlistService?.getPlaylist(id);
+  });
+
+  ipcMain.handle('playlist:create', async (_event, name) => {
+    return playlistService?.createPlaylist(name);
+  });
+
+  ipcMain.handle('playlist:save-items', async (_event, { id, items }) => {
+    playlistService?.savePlaylistItems(id, items);
+  });
+
+  ipcMain.handle('playlist:rename', async (_event, { id, name }) => {
+    return playlistService?.renamePlaylist(id, name);
+  });
+
+  ipcMain.handle('playlist:delete', async (_event, id) => {
+    return playlistService?.deletePlaylist(id);
+  });
+
   // Resume Playback
   ipcMain.on('playback:sync-time', (_event, { position }) => {
     const currentState = playbackService?.getState();
@@ -482,11 +507,15 @@ if (!gotTheLock) {
     });
 
     downloadService = new DownloadService();
-    // NetworkManager is created in registerIpcHandlers to attach listeners to mainWindow...
-    // But MediaServer needs it. So we should create it here?
-    // Or pass it later? MediaServer constructor expects it optional.
-    // Ideally we create services in one place.
-    // Let's create NetworkManager here.
+
+    // Validate binaries BEFORE starting any media services or windows
+    console.log('[Main] Initializing DownloadService...');
+    try {
+      await downloadService.init();
+      console.log('[Main] DownloadService initialized successfully.');
+    } catch (err) {
+      console.error('[Main] Failed to initialize DownloadService:', err);
+    }
 
     networkManager = new NetworkManager();
     mediaServer = new MediaServer(
