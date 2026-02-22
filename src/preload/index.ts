@@ -120,6 +120,7 @@ const electronAPI = {
   // YouTube
   youtube: {
     search: (query: string): Promise<any[]> => ipcRenderer.invoke('youtube:search', query),
+    getPlaylist: (url: string): Promise<any[]> => ipcRenderer.invoke('youtube:get-playlist', url),
   },
 
   // Library

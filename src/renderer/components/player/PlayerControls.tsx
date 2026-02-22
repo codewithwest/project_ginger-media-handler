@@ -19,6 +19,7 @@ export function PlayerControls({
 }: PlayerControlsProps) {
   const {
     status,
+    currentSource,
     shuffle,
     repeat,
     volume,
@@ -37,6 +38,7 @@ export function PlayerControls({
   } = useMediaPlayerStore();
 
   const isPlaying = status === 'playing';
+  const isYouTube = currentSource?.providerId === 'youtube';
 
   const formatTime = (seconds: number) => {
     if (!seconds || !isFinite(seconds) || isNaN(seconds)) return '0:00';
@@ -64,41 +66,43 @@ export function PlayerControls({
 
   return (
     <div className="flex flex-col gap-2 w-full animate-fade-in">
-      {/* Progress Bar */}
-      <div className="flex items-center gap-4 w-full px-2">
-        <span className="text-[10px] text-gray-500 w-[38px] text-right font-mono tabular-nums shrink-0">
-          {formatTime(position)}
-        </span>
-        <div className="flex-1 relative group h-6 flex items-center">
-          <input
-            type="range"
-            min="0"
-            max={duration || 100}
-            value={position}
-            onChange={handleSeek}
-            className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer z-10
-              accent-primary-500
-              hover:accent-primary-400
-              [&::-webkit-slider-thumb]:appearance-none
-              [&::-webkit-slider-thumb]:w-0
-              [&::-webkit-slider-thumb]:h-0
-              group-hover:[&::-webkit-slider-thumb]:w-3
-              group-hover:[&::-webkit-slider-thumb]:h-3
-              group-hover:[&::-webkit-slider-thumb]:bg-white
-              group-hover:[&::-webkit-slider-thumb]:rounded-full
-              group-hover:[&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-          />
-          <div
-            className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary-500 rounded-full pointer-events-none"
-            style={{ width: `${(position / (duration || 100)) * 100}%` }}
-          />
+      {/* Progress Bar - Hidden for YouTube as it has its own controls usually or we can't sync well */}
+      {!isYouTube && (
+        <div className="flex items-center gap-4 w-full px-2 animate-in fade-in slide-in-from-top-2 duration-500">
+          <span className="text-[10px] text-gray-500 w-[38px] text-right font-mono tabular-nums shrink-0">
+            {formatTime(position)}
+          </span>
+          <div className="flex-1 relative group h-6 flex items-center">
+            <input
+              type="range"
+              min="0"
+              max={duration || 100}
+              value={position}
+              onChange={handleSeek}
+              className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer z-10
+                accent-primary-500
+                hover:accent-primary-400
+                [&::-webkit-slider-thumb]:appearance-none
+                [&::-webkit-slider-thumb]:w-0
+                [&::-webkit-slider-thumb]:h-0
+                group-hover:[&::-webkit-slider-thumb]:w-3
+                group-hover:[&::-webkit-slider-thumb]:h-3
+                group-hover:[&::-webkit-slider-thumb]:bg-white
+                group-hover:[&::-webkit-slider-thumb]:rounded-full
+                group-hover:[&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+            />
+            <div
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary-500 rounded-full pointer-events-none"
+              style={{ width: `${(position / (duration || 100)) * 100}%` }}
+            />
+          </div>
+          <span className="text-[10px] text-gray-500 w-[38px] font-mono tabular-nums shrink-0">
+            {formatTime(duration)}
+          </span>
         </div>
-        <span className="text-[10px] text-gray-500 w-[38px] font-mono tabular-nums shrink-0">
-          {formatTime(duration)}
-        </span>
-      </div>
+      )}
 
-      <div className="flex items-center justify-between w-full h-14">
+      <div className={`flex items-center justify-between w-full h-14 ${isYouTube ? 'mt-2' : ''}`}>
         {/* Left: Secondary controls */}
         <div className="flex items-center gap-1 w-1/3">
           <Tooltip content="Shuffle" position="top">

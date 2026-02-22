@@ -49,4 +49,31 @@ export class YouTubeService {
             return [];
         }
     }
+
+    async getPlaylist(url: string): Promise<YouTubeSearchResult[]> {
+        if (!this.ytdlp) await this.init();
+        if (!this.ytdlp) throw new Error("yt-dlp not initialized");
+
+        try {
+            const info = await this.ytdlp.getInfoAsync(url, {
+                dumpSingleJson: true,
+                flatPlaylist: true
+            } as never) as any;
+
+            if (info && info.entries) {
+                return info.entries.map((entry: any) => ({
+                    id: entry.id,
+                    title: entry.title,
+                    thumbnail: entry.thumbnails?.[0]?.url || `https://i.ytimg.com/vi/${entry.id}/hqdefault.jpg`,
+                    duration: entry.duration || 0,
+                    channel: entry.uploader || entry.channel || 'Unknown',
+                    url: `https://www.youtube.com/watch?v=${entry.id}`
+                }));
+            }
+            return [];
+        } catch (err) {
+            console.error("[YouTubeService] Playlist error:", err);
+            return [];
+        }
+    }
 }

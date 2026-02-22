@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Play, Loader2, X, Youtube } from 'lucide-react';
+import { Search, Download, Play, Loader2, X, Youtube, ListMusic } from 'lucide-react';
 import { useMediaPlayerStore } from '../../state/media-player';
 
 export function YouTubeView({ onClose }: { onClose?: () => void }) {
@@ -9,6 +9,10 @@ export function YouTubeView({ onClose }: { onClose?: () => void }) {
     const [error, setError] = useState('');
     const { addToPlaylist } = useMediaPlayerStore();
 
+    const isPlaylistUrl = (url: string) => {
+        return url.includes('list=') || url.includes('playlist?list=');
+    };
+
     const handleSearch = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!query.trim()) return;
@@ -17,11 +21,33 @@ export function YouTubeView({ onClose }: { onClose?: () => void }) {
         setError('');
 
         try {
-            const data = await window.electronAPI.youtube.search(query);
-            setResults(data);
+            if (isPlaylistUrl(query)) {
+                const playlistTracks = await window.electronAPI.youtube.getPlaylist(query);
+                if (playlistTracks.length === 0) {
+                    setError('No tracks found in playlist or playlist is private.');
+                } else {
+                    // Load all tracks into playlist
+                    playlistTracks.forEach((video: any, index: number) => {
+                        const mediaItem = {
+                            id: video.id,
+                            title: video.title,
+                            type: 'provider' as const,
+                            mediaType: 'video' as const,
+                            path: `https://www.youtube.com/watch?v=${video.id}`,
+                            providerId: 'youtube',
+                            duration: video.duration
+                        };
+                        addToPlaylist(mediaItem, index === 0); // Play first track immediately
+                    });
+                    if (onClose) onClose();
+                }
+            } else {
+                const data = await window.electronAPI.youtube.search(query);
+                setResults(data);
+            }
         } catch (err) {
             console.error(err);
-            setError('Failed to search YouTube.');
+            setError('Failed to fetch from YouTube.');
         } finally {
             setLoading(false);
         }
@@ -93,7 +119,7 @@ export function YouTubeView({ onClose }: { onClose?: () => void }) {
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search YouTube..."
+                            placeholder="Paste YouTube Search or Playlist URL..."
                             className="w-full pl-16 pr-24 py-5 bg-white/5 border border-white/5 focus:border-red-500/50 rounded-3xl text-xl text-white outline-none shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] transition-all placeholder:text-gray-600"
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
@@ -111,7 +137,7 @@ export function YouTubeView({ onClose }: { onClose?: () => void }) {
                                 disabled={loading || !query.trim()}
                                 className="bg-red-500 hover:bg-red-600 active:bg-red-700 text-white p-3 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mr-1"
                             >
-                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : isPlaylistUrl(query) ? <ListMusic className="w-5 h-5" /> : <Search className="w-5 h-5" />}
                             </button>
                         </div>
                     </form>
@@ -123,13 +149,13 @@ export function YouTubeView({ onClose }: { onClose?: () => void }) {
                     {!loading && results.length === 0 && !query ? (
                         <div className="h-full flex flex-col items-center justify-center space-y-4 opacity-30 select-none py-12">
                             <Youtube className="w-16 h-16 mb-2" />
-                            <h3 className="text-xl font-bold">What do you want to watch?</h3>
-                            <p className="text-sm">Search the entire YouTube database instantly.</p>
+                            <h3 className="text-xl font-bold">What do you want to play?</h3>
+                            <p className="text-sm">Search videos or paste a playlist link to load everything.</p>
                         </div>
                     ) : loading ? (
                         <div className="h-full flex flex-col items-center justify-center py-12">
                             <Loader2 className="w-12 h-12 text-red-500 animate-spin mb-4" />
-                            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Searching YouTube...</span>
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{isPlaylistUrl(query) ? 'Loading Playlist...' : 'Searching YouTube...'}</span>
                         </div>
                     ) : results.length === 0 && query && !error && !loading ? (
                         <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
@@ -190,7 +216,8 @@ export function YouTubeView({ onClose }: { onClose?: () => void }) {
                                 </section>
                             )}
                         </div>
-                    )}
+                    )
+                    }
                 </div>
 
                 {/* Footer */}

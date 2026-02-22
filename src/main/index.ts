@@ -436,8 +436,12 @@ async function registerIpcHandlers(): Promise<void> {
     return pluginService?.getPlugins() || [];
   });
 
-  ipcMain.handle('plugins:update-setting', async (_event, { pluginName, key, value }) => {
-    return await pluginService?.updatePluginSetting(pluginName, key, value);
+  ipcMain.handle('youtube:search', async (_event, query) => {
+    return await youtubeService?.search(query) || [];
+  });
+
+  ipcMain.handle('youtube:get-playlist', async (_event, url) => {
+    return await youtubeService?.getPlaylist(url) || [];
   });
 }
 
