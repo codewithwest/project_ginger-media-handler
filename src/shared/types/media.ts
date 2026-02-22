@@ -38,6 +38,7 @@ export interface PlaybackState {
   position: number;
   duration: number;
   volume: number;
+  isMuted: boolean;
   shuffle: boolean;
   repeat: RepeatMode;
   playbackSpeed: number;

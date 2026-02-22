@@ -11,6 +11,7 @@ export class PlaybackService extends EventEmitter {
       position: 0,
       duration: 0,
       volume: 1.0,
+      isMuted: false,
       shuffle: false,
       repeat: 'off',
       playbackSpeed: 1.0
@@ -37,6 +38,7 @@ export class PlaybackService extends EventEmitter {
       ipcMain.handle('playback:set-shuffle', (_event, shuffle: boolean) => this.setShuffle(shuffle));
       ipcMain.handle('playback:set-repeat', (_event, repeat: RepeatMode) => this.setRepeat(repeat));
       ipcMain.handle('playback:set-speed', (_event, speed: number) => this.setSpeed(speed));
+      ipcMain.handle('playback:toggle-mute', () => this.toggleMute());
 
       // State sync
       ipcMain.handle('playback:get-state', () => ({
@@ -193,6 +195,11 @@ export class PlaybackService extends EventEmitter {
 
    public setSpeed(speed: number) {
       this.state.playbackSpeed = speed;
+      this.notifyStateChanged();
+   }
+
+   public toggleMute() {
+      this.state.isMuted = !this.state.isMuted;
       this.notifyStateChanged();
    }
 

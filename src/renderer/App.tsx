@@ -264,49 +264,47 @@ export function App() {
             {activeTab === 'plugins' && <PluginSettingsView onClose={() => setActiveTab('player')} />}
             {activeTab === 'jobs' && <JobDashboard onClose={() => setActiveTab('player')} />}
 
-            {/* Main Stage (Player) and persistent media container */}
-            <div className={`flex-1 h-full relative flex items-center justify-center overflow-hidden ${(activeTab !== 'player' && activeTab !== null) ? 'hidden' : ''}`}>
+            {/* Persistent Media Stage */}
+            <div className={`
+              absolute inset-0 transition-all duration-700 ease-in-out flex items-center justify-center overflow-hidden
+              ${activeTab === 'player' || activeTab === null ? 'z-10 opacity-100' : 'z-0 opacity-0 pointer-events-none scale-95'}
+            `}>
               {streamUrl ? (
-                <div className="w-full h-full animate-fade-in relative">
+                <div className="w-full h-full relative">
                   <VideoPlayer key={streamUrl} />
                 </div>
               ) : (
-                /* Premium Placeholder */
-                <div className="flex flex-col items-center gap-8 mb-12 z-10 animate-fade-in">
-                  <div className="relative group">
-                    <div className="absolute -inset-4 bg-primary-500/20 rounded-full blur-2xl group-hover:bg-primary-500/30 transition-all duration-500" />
-                    <div className="w-56 h-56 rounded-3xl glass flex items-center justify-center shadow-2xl relative">
-                      <Disc3 className="w-28 h-28 text-primary-500 animate-spin-slow" />
+                /* Premium Placeholder - only shown when on player tab and no track is playing */
+                (activeTab === 'player' || activeTab === null) && (
+                  <div className="flex flex-col items-center gap-8 mb-12 z-10 animate-fade-in">
+                    <div className="relative group">
+                      <div className="absolute -inset-4 bg-primary-500/20 rounded-full blur-2xl group-hover:bg-primary-500/30 transition-all duration-500" />
+                      <div className="w-56 h-56 rounded-3xl glass flex items-center justify-center shadow-2xl relative">
+                        <Disc3 className="w-28 h-28 text-primary-500 animate-spin-slow" />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="text-center space-y-2">
-                    <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
-                      Ready for Music?
-                    </h2>
-                    <p className="text-gray-500 text-sm max-w-[240px] mx-auto leading-relaxed">
-                      Select a track from your library or drop files here to begin your experience.
-                    </p>
-                    <div className="pt-6">
-                      <button
-                        onClick={handleOpenFiles}
-                        className="group flex items-center gap-3 px-6 py-3 bg-primary-600 hover:bg-primary-500 rounded-2xl text-sm font-semibold text-white transition-all duration-300 shadow-lg shadow-primary-900/40 hover:scale-105 active:scale-95"
-                      >
-                        <FolderOpen className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                        <span>Open Media</span>
-                      </button>
+                    <div className="text-center space-y-2">
+                      <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
+                        Ready for Music?
+                      </h2>
+                      <p className="text-gray-500 text-sm max-w-[240px] mx-auto leading-relaxed">
+                        Select a track from your library or drop files here to begin your experience.
+                      </p>
+                      <div className="pt-6">
+                        <button
+                          onClick={handleOpenFiles}
+                          className="group flex items-center gap-3 px-6 py-3 bg-primary-600 hover:bg-primary-500 rounded-2xl text-sm font-semibold text-white transition-all duration-300 shadow-lg shadow-primary-900/40 hover:scale-105 active:scale-95"
+                        >
+                          <FolderOpen className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                          <span>Open Media</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )
               )}
             </div>
-
-            {/* Always-mounted but potentially invisible VideoPlayer for background audio */}
-            {streamUrl && (activeTab !== 'player' && activeTab !== null) && (
-              <div className="absolute inset-0 pointer-events-none opacity-0 overflow-hidden">
-                <VideoPlayer key={streamUrl} />
-              </div>
-            )}
           </div>
         </div>
 

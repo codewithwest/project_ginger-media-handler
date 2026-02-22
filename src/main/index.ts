@@ -340,10 +340,7 @@ async function registerIpcHandlers(): Promise<void> {
     return [];
   });
 
-  // YouTube
-  ipcMain.handle('youtube:search', async (_event, query) => {
-    return await youtubeService?.search(query);
-  });
+  // YouTube handlers are registered below with others
 
   // Window controls
   ipcMain.handle('window:minimize', async () => {
@@ -451,6 +448,8 @@ function registerGlobalShortcuts(): void {
   });
   globalShortcut.register('MediaNextTrack', () => playbackService?.next());
   globalShortcut.register('MediaPreviousTrack', () => playbackService?.previous());
+  globalShortcut.register('MediaVolumeMute', () => playbackService?.toggleMute());
+  globalShortcut.register('CommandOrControl+M', () => playbackService?.toggleMute());
 
   // Listen for signals from Tray or other modules
   // Listen for signals from Tray or other modules using Node EventEmitter
@@ -536,6 +535,7 @@ if (!gotTheLock) {
     }
 
     createWindow();
+    youtubeService = new YouTubeService(downloadService);
     await registerIpcHandlers();
     registerGlobalShortcuts();
 
