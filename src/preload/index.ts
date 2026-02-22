@@ -19,6 +19,8 @@ import type {
   SMBConfig,
   PluginUITab,
   GingerMediaProvider,
+  PlaylistMetadata,
+  Playlist,
 } from '@shared/types';
 
 // Create type-safe API
@@ -35,6 +37,8 @@ const electronAPI = {
       ipcRenderer.invoke('playback:seek', position),
     setVolume: (volume: number): Promise<void> =>
       ipcRenderer.invoke('playback:set-volume', volume),
+    toggleMute: (): Promise<void> =>
+      ipcRenderer.invoke('playback:toggle-mute'),
     next: (): Promise<void> =>
       ipcRenderer.invoke('playback:next'),
     previous: (): Promise<void> =>
@@ -49,6 +53,8 @@ const electronAPI = {
       ipcRenderer.invoke('playback:add-to-playlist', { item, playNow }),
     clearPlaylist: (): Promise<void> =>
       ipcRenderer.invoke('playback:clear-playlist'),
+    removeFromPlaylist: (index: number): Promise<void> =>
+      ipcRenderer.invoke('playback:remove-from-playlist', { index }),
 
     // Sync position from Renderer to Main
     syncTime: (position: number, duration?: number) =>
@@ -113,6 +119,12 @@ const electronAPI = {
       ipcRenderer.invoke('download:get-formats', { url }),
   },
 
+  // YouTube
+  youtube: {
+    search: (query: string): Promise<any[]> => ipcRenderer.invoke('youtube:search', query),
+    getPlaylist: (url: string): Promise<any[]> => ipcRenderer.invoke('youtube:get-playlist', url),
+  },
+
   // Library
   library: {
     addFolder: (path: string): Promise<void> => ipcRenderer.invoke('library:add-folder', { path }),
@@ -154,7 +166,7 @@ const electronAPI = {
   },
 
 
-  
+
   // Network
   network: {
     scanStart: (): Promise<void> => ipcRenderer.invoke('network:scan-start'),
@@ -163,9 +175,9 @@ const electronAPI = {
     browse: (server: NetworkServer, path?: string): Promise<MediaSource[]> => ipcRenderer.invoke('network:browse', { server, path }),
     connectSMB: (config: SMBConfig): Promise<void> => ipcRenderer.invoke('network:connect-smb', config),
     onServerFound: (callback: (server: NetworkServer) => void) => {
-        const subscription = (_event: IpcRendererEvent, server: NetworkServer) => callback(server);
-        ipcRenderer.on('network:server-found', subscription);
-        return () => { ipcRenderer.removeListener('network:server-found', subscription); };
+      const subscription = (_event: IpcRendererEvent, server: NetworkServer) => callback(server);
+      ipcRenderer.on('network:server-found', subscription);
+      return () => { ipcRenderer.removeListener('network:server-found', subscription); };
     },
   },
 
@@ -175,27 +187,27 @@ const electronAPI = {
   plugins: {
     getUITabs: (): Promise<PluginUITab[]> => ipcRenderer.invoke('plugins:get-ui-tabs'),
     onUIUpdated: (callback: (tabs: PluginUITab[]) => void) => {
-        const subscription = (_event: IpcRendererEvent, tabs: PluginUITab[]) => callback(tabs);
-        ipcRenderer.on('plugins:ui-updated', subscription);
-        return () => { ipcRenderer.removeListener('plugins:ui-updated', subscription); };
+      const subscription = (_event: IpcRendererEvent, tabs: PluginUITab[]) => callback(tabs);
+      ipcRenderer.on('plugins:ui-updated', subscription);
+      return () => { ipcRenderer.removeListener('plugins:ui-updated', subscription); };
     },
     getProviders: (): Promise<GingerMediaProvider[]> => ipcRenderer.invoke('plugins:get-providers'),
-    browseProvider: (providerId: string, path?: string): Promise<MediaSource[]> => 
-        ipcRenderer.invoke('plugins:browse-provider', { providerId, path }),
-    searchProviders: (query: string): Promise<MediaSource[]> => 
-        ipcRenderer.invoke('plugins:search-providers', query),
+    browseProvider: (providerId: string, path?: string): Promise<MediaSource[]> =>
+      ipcRenderer.invoke('plugins:browse-provider', { providerId, path }),
+    searchProviders: (query: string): Promise<MediaSource[]> =>
+      ipcRenderer.invoke('plugins:search-providers', query),
     onProvidersUpdated: (callback: (providers: GingerMediaProvider[]) => void) => {
-        const subscription = (_event: IpcRendererEvent, providers: GingerMediaProvider[]) => callback(providers);
-        ipcRenderer.on('plugins:providers-updated', subscription);
-        return () => { ipcRenderer.removeListener('plugins:providers-updated', subscription); };
+      const subscription = (_event: IpcRendererEvent, providers: GingerMediaProvider[]) => callback(providers);
+      ipcRenderer.on('plugins:providers-updated', subscription);
+      return () => { ipcRenderer.removeListener('plugins:providers-updated', subscription); };
     },
     getAll: (): Promise<any[]> => ipcRenderer.invoke('plugins:get-all'),
-    updateSetting: (pluginName: string, key: string, value: any): Promise<void> => 
-        ipcRenderer.invoke('plugins:update-setting', { pluginName, key, value }),
+    updateSetting: (pluginName: string, key: string, value: any): Promise<void> =>
+      ipcRenderer.invoke('plugins:update-setting', { pluginName, key, value }),
     onUpdated: (callback: (plugins: any[]) => void) => {
-        const subscription = (_event: IpcRendererEvent, plugins: any[]) => callback(plugins);
-        ipcRenderer.on('plugins:updated', subscription);
-        return () => { ipcRenderer.removeListener('plugins:updated', subscription); };
+      const subscription = (_event: IpcRendererEvent, plugins: any[]) => callback(plugins);
+      ipcRenderer.on('plugins:updated', subscription);
+      return () => { ipcRenderer.removeListener('plugins:updated', subscription); };
     },
   },
 
@@ -212,6 +224,14 @@ const electronAPI = {
   settings: {
     get: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
     update: (updates: Partial<AppSettings>): Promise<AppSettings> => ipcRenderer.invoke('settings:update', updates),
+  },
+  playlists: {
+    getAll: (): Promise<PlaylistMetadata[]> => ipcRenderer.invoke('playlist:get-all'),
+    get: (id: string): Promise<Playlist | null> => ipcRenderer.invoke('playlist:get', id),
+    create: (name: string): Promise<PlaylistMetadata> => ipcRenderer.invoke('playlist:create', name),
+    saveItems: (id: string, items: MediaSource[]): Promise<void> => ipcRenderer.invoke('playlist:save-items', { id, items }),
+    rename: (id: string, name: string): Promise<boolean> => ipcRenderer.invoke('playlist:rename', { id, name }),
+    delete: (id: string): Promise<boolean> => ipcRenderer.invoke('playlist:delete', id),
   },
 };
 

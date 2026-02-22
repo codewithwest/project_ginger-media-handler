@@ -7,7 +7,9 @@ interface LibraryStore {
   folders: string[];
   tracks: LibraryTrack[];
   isLoading: boolean;
-  
+  scanProgress: { processed: number; total: number; currentFile: string } | null;
+
+  init: () => () => void;
   loadLibrary: () => Promise<void>;
   addFolder: () => Promise<void>; // Triggers dialog in main
   removeFolder: (path: string) => Promise<void>;
@@ -18,6 +20,29 @@ export const useLibraryStore = create<LibraryStore>((set) => ({
   folders: [],
   tracks: [],
   isLoading: false,
+  scanProgress: null,
+
+  init: () => {
+    // Set up listeners for background scan events
+    const unsubStart = window.electronAPI.library.onScanStart(() => {
+      set({ isLoading: true, scanProgress: null });
+    });
+
+    const unsubProgress = window.electronAPI.library.onScanProgress((progress) => {
+      set({ scanProgress: progress, isLoading: true });
+    });
+
+    const unsubComplete = window.electronAPI.library.onScanComplete((tracks) => {
+      set({ tracks, isLoading: false, scanProgress: null });
+    });
+
+    // Cleanup function
+    return () => {
+      unsubStart();
+      unsubProgress();
+      unsubComplete();
+    };
+  },
 
   loadLibrary: async () => {
     set({ isLoading: true });
@@ -39,7 +64,7 @@ export const useLibraryStore = create<LibraryStore>((set) => ({
       set({ isLoading: true });
       // Add folder to backend (this will trigger scan too)
       await window.electronAPI.library.addFolder(folderPath);
-      
+
       // Refresh local state
       const folders = await window.electronAPI.library.getFolders();
       const tracks = await window.electronAPI.library.getAll();
@@ -51,20 +76,15 @@ export const useLibraryStore = create<LibraryStore>((set) => ({
   },
 
   removeFolder: async (path: string) => {
-      const tracks = await window.electronAPI.library.removeFolder(path);
-      // Update folders list locally too?
-      const folders = await window.electronAPI.library.getFolders();
-      set({ folders, tracks });
+    await window.electronAPI.library.removeFolder(path);
+    // Update folders list locally too?
+    const folders = await window.electronAPI.library.getFolders();
+    const tracks = await window.electronAPI.library.getAll();
+    set({ folders, tracks });
   },
 
   scanLibrary: async () => {
-    set({ isLoading: true });
-    try {
-      const tracks = await window.electronAPI.library.scan();
-      set({ tracks, isLoading: false });
-    } catch (err) {
-      console.error('Failed to scan library:', err);
-      set({ isLoading: false });
-    }
+    // The scan events will handle the state updates
+    await window.electronAPI.library.scan();
   }
 }));

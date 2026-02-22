@@ -3,12 +3,11 @@
 /**
  * Represents an item in the playback queue/playlist
  */
-import { MediaSource } from './media';
+
 
 /**
- * Represents an item in the playback queue/playlist
+ * Application settings structure
  */
-export type PlaylistItem = MediaSource;
 
 
 /**

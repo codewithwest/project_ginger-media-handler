@@ -11,6 +11,7 @@ export class PlaybackService extends EventEmitter {
       position: 0,
       duration: 0,
       volume: 1.0,
+      isMuted: false,
       shuffle: false,
       repeat: 'off',
       playbackSpeed: 1.0
@@ -37,6 +38,7 @@ export class PlaybackService extends EventEmitter {
       ipcMain.handle('playback:set-shuffle', (_event, shuffle: boolean) => this.setShuffle(shuffle));
       ipcMain.handle('playback:set-repeat', (_event, repeat: RepeatMode) => this.setRepeat(repeat));
       ipcMain.handle('playback:set-speed', (_event, speed: number) => this.setSpeed(speed));
+      ipcMain.handle('playback:toggle-mute', () => this.toggleMute());
 
       // State sync
       ipcMain.handle('playback:get-state', () => ({
@@ -67,6 +69,28 @@ export class PlaybackService extends EventEmitter {
          this.currentIndex = -1;
          this.state.currentSource = null;
          this.state.status = 'stopped';
+         this.playlistService.save(this.playlist);
+         this.notifyStateChanged();
+      });
+
+      ipcMain.handle('playback:remove-from-playlist', (_event, { index }: { index: number }) => {
+         if (index < 0 || index >= this.playlist.length) return;
+         this.playlist.splice(index, 1);
+         // Adjust currentIndex if we removed something at or before it
+         if (index < this.currentIndex) {
+            this.currentIndex--;
+         } else if (index === this.currentIndex) {
+            // Removed the playing track — stop playback or move to next
+            if (this.playlist.length === 0) {
+               this.currentIndex = -1;
+               this.state.currentSource = null;
+               this.state.status = 'stopped';
+            } else {
+               // clamp to last if we were at the end
+               this.currentIndex = Math.min(this.currentIndex, this.playlist.length - 1);
+               this.state.currentSource = this.playlist[this.currentIndex];
+            }
+         }
          this.playlistService.save(this.playlist);
          this.notifyStateChanged();
       });
@@ -171,6 +195,11 @@ export class PlaybackService extends EventEmitter {
 
    public setSpeed(speed: number) {
       this.state.playbackSpeed = speed;
+      this.notifyStateChanged();
+   }
+
+   public toggleMute() {
+      this.state.isMuted = !this.state.isMuted;
       this.notifyStateChanged();
    }
 

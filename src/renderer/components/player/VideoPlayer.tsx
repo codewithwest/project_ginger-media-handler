@@ -52,11 +52,13 @@ export function VideoPlayer() {
   // Sync Seek (Position) - careful to avoid loops
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || isNaN(position) || !isFinite(position)) return;
 
     // Only seek if the difference is significant (> 0.5s) to avoid fighting with timeUpdate
-    if (Math.abs(video.currentTime - position) > 0.5) {
-      video.currentTime = position;
+    // Also ensure we don't seek past the video's actual duration to avoid "crazy" behavior
+    const targetPos = Math.max(0, Math.min(position, video.duration || position));
+    if (Math.abs(video.currentTime - targetPos) > 0.5) {
+      video.currentTime = targetPos;
     }
   }, [position]);
 
@@ -117,14 +119,44 @@ export function VideoPlayer() {
     }
   }, [initAudio]);
 
+  if (currentSource?.providerId === 'youtube') {
+    let videoId = '';
+    try {
+      if (currentSource.path.includes('v=')) {
+        videoId = new URL(currentSource.path).searchParams.get('v') || '';
+      } else if (currentSource.path.includes('youtu.be/')) {
+        videoId = currentSource.path.split('youtu.be/')[1].split('?')[0];
+      }
+    } catch (e) {
+      console.error("Failed to parse YouTube URL for embed", e);
+    }
+
+    if (videoId) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-black overflow-hidden relative z-[50]">
+          <iframe
+            className="w-full h-full z-10 absolute inset-0"
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+            title="YouTube Video Player"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      );
+    }
+  }
+
   if (!streamUrl) return null;
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden relative group">
       {/* Background/Visualizer layer */}
       {currentSource?.path && !currentSource.path.toLowerCase().endsWith('.mp4') && (
-        <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
-          <Visualizer />
+        <div className="absolute inset-0 flex items-center justify-center opacity-80 pointer-events-none z-0">
+          <div className="relative w-[500px] h-[500px] flex items-center justify-center">
+            <Visualizer />
+          </div>
         </div>
       )}
 
@@ -150,10 +182,7 @@ export function VideoPlayer() {
         )}
       </video>
 
-      {/* Bottom Visualizer Strip */}
-      <div className="absolute bottom-0 inset-x-0 h-16 opacity-50 pointer-events-none z-20">
-        <Visualizer />
-      </div>
+      {/* Bottom Visualizer Strip removed in favor of central one for circular design */}
     </div>
   );
 }

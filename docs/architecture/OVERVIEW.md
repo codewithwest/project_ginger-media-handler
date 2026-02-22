@@ -377,9 +377,9 @@ renderer/
 │   │   ├── PlaylistView.tsx       # Playlist display
 │   │   ├── PlaylistItem.tsx       # Individual track item
 │   │   └── QueueManager.tsx       # Queue controls
-│   ├── library/
-│   │   ├── LibraryBrowser.tsx     # File browser
-│   │   ├── AlbumGrid.tsx          # Album grid view
+│   ├── library/           # Media library UI
+│   │   ├── ImageBrowser.tsx       # Folder-based image gallery
+│   │   ├── LibraryView.tsx        # Audio/Video library browser
 │   │   └── SearchBar.tsx          # Search interface
 │   ├── jobs/
 │   │   ├── JobList.tsx            # Active jobs display

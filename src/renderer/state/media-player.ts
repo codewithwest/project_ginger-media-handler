@@ -6,6 +6,8 @@ import type { PlaybackState, MediaSource, MediaMetadata, MediaPlayerState } from
 interface MediaPlayerStore extends MediaPlayerState {
   playlist: MediaSource[];
   currentIndex: number;
+  playbackSpeed: number;
+  isMuted: boolean;
   streamUrl?: string;
   metadata?: MediaMetadata;
 
@@ -20,6 +22,7 @@ interface MediaPlayerStore extends MediaPlayerState {
   stop: () => void;
   seek: (position: number) => void;
   setVolume: (volume: number) => void;
+  toggleMute: () => void;
   next: () => void;
   previous: () => void;
   toggleShuffle: () => void;
@@ -43,6 +46,7 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
   shuffle: false,
   repeat: 'off',
   playbackSpeed: 1.0,
+  isMuted: false,
   streamUrl: undefined,
   metadata: undefined,
   playlist: [],
@@ -72,7 +76,11 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
   setPlaybackState: (newState) => set((state) => ({ ...state, ...newState })),
 
   syncTime: (position, duration) => {
-    set({ position, duration });
+    const update: Partial<MediaPlayerState> = { position };
+    if (duration !== undefined && isFinite(duration) && duration > 0) {
+      update.duration = duration;
+    }
+    set(update);
     window.electronAPI.media.syncTime(position, duration);
   },
 
@@ -89,6 +97,8 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
     set({ volume });
     window.electronAPI.media.setVolume(volume);
   },
+
+  toggleMute: () => window.electronAPI.media.toggleMute(),
 
   next: () => window.electronAPI.media.next(),
   previous: () => window.electronAPI.media.previous(),
@@ -119,8 +129,8 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
     window.electronAPI.media.addToPlaylist(item, playNow);
   },
 
-  removeFromPlaylist: () => {
-    // TODO: Implement in PlaybackService
+  removeFromPlaylist: (index: number) => {
+    window.electronAPI.media.removeFromPlaylist(index);
   },
 
   clearPlaylist: () => window.electronAPI.media.clearPlaylist(),
@@ -130,24 +140,54 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
     if (index < 0 || index >= playlist.length) return;
 
     const item = playlist[index];
-    try {
-      const url = await window.electronAPI.media.getStreamUrl(item);
-      const metadata = await window.electronAPI.media.getMetadata(item.path);
-      const resumePos = await window.electronAPI.media.getResumePosition(item.id);
 
+    // YouTube items stream via iframe — skip ffprobe/getStreamUrl entirely
+    if (item.providerId === 'youtube') {
       set({
         currentSource: item,
         currentIndex: index,
-        streamUrl: url,
-        metadata: metadata,
+        streamUrl: item.path,
+        metadata: undefined,
+        duration: item.duration || 0,
+        position: 0,
+        status: 'playing',
+      });
+      return;
+    }
+
+    // Clear stale URL immediately
+    set({ streamUrl: undefined });
+
+    // Step 1: Get stream URL and start playback right away — don't block on metadata
+    let url: string;
+    try {
+      url = await window.electronAPI.media.getStreamUrl(item);
+    } catch (err) {
+      console.error("[MediaPlayer] Failed to get stream URL for index", index, err);
+      return;
+    }
+
+    // Commit just enough to start playback immediately
+    set({
+      currentSource: item,
+      currentIndex: index,
+      streamUrl: url,
+      position: 0,
+    });
+
+    // Step 2: Enrich with metadata and resume position — best-effort, failure won't stop playback
+    try {
+      const [metadata, resumePos] = await Promise.all([
+        window.electronAPI.media.getMetadata(item.path),
+        window.electronAPI.media.getResumePosition(item.id),
+      ]);
+      set({
+        metadata,
         duration: metadata.duration || 0,
-        // Only resume if more than 5 seconds in and not at the very end
         position: (resumePos > 5 && resumePos < (metadata.duration || 0) - 10) ? resumePos : 0
       });
-
-      // Only tell Main to play if we aren't already syncing from a play command
     } catch (err) {
-      console.error("[MediaPlayer] Failed to load at index", index, err);
+      console.warn("[MediaPlayer] Metadata fetch failed (ffprobe issue?) — playing without metadata:", err);
     }
   },
 }));

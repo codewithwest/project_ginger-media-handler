@@ -19,12 +19,26 @@ export interface MediaSource {
   isDirectory?: boolean;
 }
 
+export type PlaylistItem = MediaSource;
+
+export interface PlaylistMetadata {
+  id: string;
+  name: string;
+  itemCount: number;
+  lastModified: number;
+}
+
+export interface Playlist extends PlaylistMetadata {
+  items: MediaSource[];
+}
+
 export interface PlaybackState {
   status: PlaybackStatus;
   currentSource: MediaSource | null;
   position: number;
   duration: number;
   volume: number;
+  isMuted: boolean;
   shuffle: boolean;
   repeat: RepeatMode;
   playbackSpeed: number;
@@ -114,18 +128,18 @@ export interface SMBConfig {
 }
 
 export interface PluginUITab {
-    id: string;
-    pluginName?: string;
-    title: string;
-    icon: string;
-    route: string;
+  id: string;
+  pluginName?: string;
+  title: string;
+  icon: string;
+  route: string;
 }
 
 export interface GingerMediaProvider {
-    id: string;
-    name: string;
-    icon?: string;
-    search?: (query: string) => Promise<MediaSource[]>;
-    browse?: (path?: string) => Promise<MediaSource[]>;
-    resolve?: (source: MediaSource) => Promise<string>; // Resolves to a playable URL/stream
+  id: string;
+  name: string;
+  icon?: string;
+  search?: (query: string) => Promise<MediaSource[]>;
+  browse?: (path?: string) => Promise<MediaSource[]>;
+  resolve?: (source: MediaSource) => Promise<string>; // Resolves to a playable URL/stream
 }
