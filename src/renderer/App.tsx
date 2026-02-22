@@ -34,6 +34,7 @@ import { Equalizer } from './components/player/Equalizer';
 import { useJobsStore } from './state/jobs';
 import { Tooltip } from './components/ui/Tooltip';
 import { SplashScreen } from './components/ui/SplashScreen';
+import { useLibraryStore } from './state/library';
 
 type Tab = 'player' | 'gallery' | 'library' | 'youtube' | 'network' | 'converter' | 'jobs' | 'plugins' | 'releases' | 'search';
 

@@ -2,6 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
+import { EventEmitter } from 'events';
 import { MediaMetadataService } from './MediaMetadata';
 
 import type { LibraryTrack } from '@shared/types';
@@ -11,12 +12,13 @@ export interface LibraryData {
   tracks: LibraryTrack[];
 }
 
-export class LibraryService {
+export class LibraryService extends EventEmitter {
   private dataPath: string;
   private metadataService: MediaMetadataService;
   private data: LibraryData = { folders: [], tracks: [] };
 
   constructor(ffprobePath?: string) {
+    super();
     this.dataPath = path.join(app.getPath('userData'), 'library.json');
     this.metadataService = new MediaMetadataService(ffprobePath);
     this.load();
@@ -75,57 +77,74 @@ export class LibraryService {
 
     if (this.data.folders.length === 0) {
       console.log('No folders to scan.');
+      this.emit('scan-complete', []);
       return [];
     }
 
+    this.emit('scan-start');
+
     // existing tracks map for quick lookup
     const existingMap = new Map(this.data.tracks.map(t => [t.path, t]));
+    let processedCount = 0;
 
     for (const folder of this.data.folders) {
       if (!fs.existsSync(folder)) continue;
 
       const files = await this.recursiveReaddir(folder);
 
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         const ext = path.extname(file).toLowerCase();
+
         if (supportedExts.includes(ext)) {
           if (existingMap.has(file)) {
             newTracks.push(existingMap.get(file) as LibraryTrack);
-            continue;
-          }
+          } else {
+            try {
+              const isImage = imageExts.includes(ext);
+              let metadata: any = {};
 
-          try {
-            const isImage = imageExts.includes(ext);
-            let metadata: any = {};
+              if (!isImage) {
+                metadata = await this.metadataService.getMetadata(file);
+              }
 
-            if (!isImage) {
-              // Only use ffprobe for audio/video to avoid delays/errors on images
-              metadata = await this.metadataService.getMetadata(file);
+              const track: LibraryTrack = {
+                id: this.generateId(file),
+                path: file,
+                title: metadata.tags?.title || path.basename(file, ext),
+                artist: metadata.tags?.artist || (isImage ? 'Photo' : 'Unknown Artist'),
+                album: metadata.tags?.album || (isImage ? 'Gallery' : 'Unknown Album'),
+                duration: metadata.duration || 0,
+                format: metadata.format || ext.replace('.', ''),
+                addedAt: Date.now(),
+                lastModified: Date.now(),
+                mediaType: isImage ? 'image' : (videoExts.includes(ext) ? 'video' : 'audio'),
+              };
+
+              newTracks.push(track);
+            } catch (err) {
+              console.warn(`Failed to process file ${file}:`, err);
             }
-
-            const track: LibraryTrack = {
-              id: this.generateId(file),
-              path: file,
-              title: metadata.tags?.title || path.basename(file, ext),
-              artist: metadata.tags?.artist || (isImage ? 'Photo' : 'Unknown Artist'),
-              album: metadata.tags?.album || (isImage ? 'Gallery' : 'Unknown Album'),
-              duration: metadata.duration || 0,
-              format: metadata.format || ext.replace('.', ''),
-              addedAt: Date.now(),
-              lastModified: Date.now(),
-              mediaType: isImage ? 'image' : (videoExts.includes(ext) ? 'video' : 'audio'),
-            };
-
-            newTracks.push(track);
-          } catch (err) {
-            console.warn(`Failed to process file ${file}:`, err);
           }
+        }
+
+        processedCount++;
+        // Emit progress every 10 files and yield the event loop
+        if (processedCount % 10 === 0) {
+          this.emit('scan-progress', {
+            processed: processedCount,
+            total: files.length, // This is per-folder, could be improved to global total
+            currentFile: path.basename(file)
+          });
+          // Yield to event loop to prevent freezing
+          await new Promise(resolve => setImmediate(resolve));
         }
       }
     }
 
     this.data.tracks = newTracks;
     this.save();
+    this.emit('scan-complete', newTracks);
     return newTracks;
   }
 

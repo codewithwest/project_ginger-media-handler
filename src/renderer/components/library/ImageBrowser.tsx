@@ -25,7 +25,7 @@ interface ImageBrowserProps {
 }
 
 export function ImageBrowser({ onClose }: ImageBrowserProps) {
-    const { tracks, isLoading, addFolder, scanLibrary } = useLibraryStore();
+    const { tracks, isLoading, scanProgress, addFolder, scanLibrary } = useLibraryStore();
     const [searchQuery, setSearchQuery] = useState('');
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [newName, setNewName] = useState('');
@@ -129,9 +129,18 @@ export function ImageBrowser({ onClose }: ImageBrowserProps) {
                             <div className="flex items-center gap-2">
                                 <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">{images.length} Photos total</p>
                                 {isLoading && (
-                                    <div className="flex items-center gap-1">
-                                        <span className="w-1 h-1 bg-indigo-400 rounded-full animate-ping" />
-                                        <span className="text-[8px] text-indigo-400 font-bold uppercase tracking-tighter">Scanning...</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1">
+                                            <span className="w-1 h-1 bg-indigo-400 rounded-full animate-ping" />
+                                            <span className="text-[8px] text-indigo-400 font-bold uppercase tracking-tighter">
+                                                {scanProgress ? `Scanning: ${scanProgress.processed} items...` : 'Initializing scan...'}
+                                            </span>
+                                        </div>
+                                        {scanProgress?.currentFile && (
+                                            <span className="text-[8px] text-gray-500 truncate max-w-[120px] italic">
+                                                {scanProgress.currentFile}
+                                            </span>
+                                        )}
                                     </div>
                                 )}
                             </div>

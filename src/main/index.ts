@@ -170,6 +170,19 @@ async function registerIpcHandlers(): Promise<void> {
 
   const conversionService = new ConversionService(ffmpegPath);
   libraryService = new LibraryService(ffprobePath);
+
+  libraryService.on('scan-start', () => {
+    mainWindow?.webContents.send('library:scan-start');
+  });
+
+  libraryService.on('scan-progress', (progress) => {
+    mainWindow?.webContents.send('library:scan-progress', progress);
+  });
+
+  libraryService.on('scan-complete', (tracks) => {
+    mainWindow?.webContents.send('library:scan-complete', tracks);
+  });
+
   updateService = new UpdateService(mainWindow as BrowserWindow);
   new ReleaseService();
 
@@ -443,20 +456,19 @@ async function registerIpcHandlers(): Promise<void> {
 }
 
 function registerGlobalShortcuts(): void {
-  globalShortcut.register('MediaPlayPause', () => {
-    playbackService?.toggle();
-  });
-  globalShortcut.register('MediaNextTrack', () => playbackService?.next());
-  globalShortcut.register('MediaPreviousTrack', () => playbackService?.previous());
-  globalShortcut.register('MediaVolumeMute', () => playbackService?.toggleMute());
-  globalShortcut.register('CommandOrControl+M', () => playbackService?.toggleMute());
+  const registerSafety = (key: string, callback: () => void) => {
+    try {
+      globalShortcut.register(key, callback);
+    } catch (e) {
+      console.error(`[Main] Failed to register global shortcut: ${key}`, e);
+    }
+  };
 
-  // Listen for signals from Tray or other modules
-  // Listen for signals from Tray or other modules using Node EventEmitter
-  // properly cast to avoid 'any' if possible, or use specific strings
-  app.on('playback:toggle' as 'activate', () => playbackService?.toggle());
-  app.on('playback:next' as 'activate', () => playbackService?.next());
-  app.on('playback:previous' as 'activate', () => playbackService?.previous());
+  registerSafety('MediaPlayPause', () => playbackService?.toggle());
+  registerSafety('MediaNextTrack', () => playbackService?.next());
+  registerSafety('MediaPreviousTrack', () => playbackService?.previous());
+  registerSafety('VolumeMute', () => playbackService?.toggleMute());
+  registerSafety('CommandOrControl+M', () => playbackService?.toggleMute());
 }
 
 if (!gotTheLock) {

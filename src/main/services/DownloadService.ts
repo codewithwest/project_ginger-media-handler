@@ -31,7 +31,7 @@ export class DownloadService {
 
     if (fs.existsSync(customPath)) return customPath;
 
-    let probePath = ffprobeStaticPath;
+    const probePath = ffprobeStaticPath;
 
     // Vite + Electron Forge sometimes incorrectly resolves node_modules paths 
     // to build-time locations that don't exist in dev. 

@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import type { MediaSource, PlaylistMetadata, Playlist } from '../../shared/types/media';
 
 export class PlaylistService {
@@ -60,7 +60,7 @@ export class PlaylistService {
   }
 
   createPlaylist(name: string): PlaylistMetadata {
-    const id = uuidv4();
+    const id = randomUUID();
     const newPlaylist: PlaylistMetadata = {
       id,
       name,
