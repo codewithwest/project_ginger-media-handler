@@ -151,8 +151,10 @@ export function VideoPlayer() {
     <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden relative group">
       {/* Background/Visualizer layer */}
       {currentSource?.path && !currentSource.path.toLowerCase().endsWith('.mp4') && (
-        <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none">
-          <Visualizer />
+        <div className="absolute inset-0 flex items-center justify-center opacity-80 pointer-events-none z-0">
+          <div className="relative w-[500px] h-[500px] flex items-center justify-center">
+            <Visualizer />
+          </div>
         </div>
       )}
 
@@ -178,10 +180,7 @@ export function VideoPlayer() {
         )}
       </video>
 
-      {/* Bottom Visualizer Strip */}
-      <div className="absolute bottom-0 inset-x-0 h-16 opacity-50 pointer-events-none z-20">
-        <Visualizer />
-      </div>
+      {/* Bottom Visualizer Strip removed in favor of central one for circular design */}
     </div>
   );
 }

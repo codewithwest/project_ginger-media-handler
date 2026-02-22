@@ -319,6 +319,16 @@ export function App() {
             ${showQueue ? 'w-80 translate-x-0' : 'w-0 translate-x-full opacity-0 pointer-events-none'}
           `}
         >
+          {/* Collapse pull-tab on the left edge */}
+          {showQueue && (
+            <button
+              onClick={() => setShowQueue(false)}
+              title="Collapse Queue"
+              className="absolute -left-4 top-1/2 -translate-y-1/2 z-50 w-4 h-12 flex items-center justify-center bg-white/5 hover:bg-white/15 border border-white/10 border-r-0 rounded-l-lg transition-colors text-gray-500 hover:text-white"
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><path d="M0 4L6 0v8L0 4z" /></svg>
+            </button>
+          )}
           <div className="h-full w-80 glass-dark border-l border-white/5">
             <PlaylistSidebar />
           </div>

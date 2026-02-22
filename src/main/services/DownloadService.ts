@@ -2,6 +2,8 @@ import { YtDlp, helpers } from 'ytdlp-nodejs';
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { execFile } from 'child_process';
+import { path as ffprobeStaticPath } from 'ffprobe-static';
 import { DownloadRequest, JobProgress } from '../../shared/types/media';
 import { MediaMetadataService } from './MediaMetadata';
 
@@ -25,12 +27,28 @@ export class DownloadService {
 
   getFFprobePath(): string {
     const fileName = process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
-    return path.join(this.binPath, fileName);
+    const customPath = path.join(this.binPath, fileName);
+    // Prefer the downloaded binary if it exists, otherwise fall back to the
+    // statically compiled npm package binary (ffprobe-static)
+    return fs.existsSync(customPath) ? customPath : (ffprobeStaticPath || '');
   }
 
   getYtDlpPath(): string {
     const fileName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
     return path.join(this.binPath, fileName);
+  }
+
+  /** Returns true if the binary at the given path can run without crashing. */
+  private validateBinary(binPath: string): Promise<boolean> {
+    if (!fs.existsSync(binPath)) return Promise.resolve(false);
+    return new Promise(resolve => {
+      execFile(binPath, ['-version'], { timeout: 5000 }, (err) => {
+        if (!err) { resolve(true); return; }
+        // SIGSEGV crashes will have `signal` set on the error object
+        const asAny = err as { signal?: string; code?: string | number };
+        resolve(!asAny.signal);
+      });
+    });
   }
 
   async init(): Promise<void> {
@@ -72,6 +90,17 @@ export class DownloadService {
         }
       }
 
+      // Validate the downloaded ffprobe before using it - it can crash with
+      // SIGSEGV if the binary is incompatible with the OS. If validation fails,
+      // getFFprobePath() will automatically fall back to ffprobe-static.
+      if (fs.existsSync(ffprobePath)) {
+        const probeOk = await this.validateBinary(ffprobePath);
+        if (!probeOk) {
+          console.warn('[DownloadService] Downloaded ffprobe is broken — deleting and using ffprobe-static fallback.');
+          try { fs.unlinkSync(ffprobePath); } catch (e) { /* ignore */ }
+        }
+      }
+
       if (fs.existsSync(ytDlpPath)) {
         const ffPath = fs.existsSync(ffmpegPath) ? ffmpegPath : undefined;
         this.ytdlp = new YtDlp({
@@ -79,7 +108,9 @@ export class DownloadService {
           ffmpegPath: ffPath
         });
 
-        this.metadataService = new MediaMetadataService(fs.existsSync(ffprobePath) ? ffprobePath : undefined);
+        // Use the resolved path (may be ffprobe-static fallback if the download was broken)
+        const resolvedProbe = this.getFFprobePath();
+        this.metadataService = new MediaMetadataService(resolvedProbe || undefined);
       }
     } catch (error) {
       console.error('[DownloadService] Unexpected error during init:', error);

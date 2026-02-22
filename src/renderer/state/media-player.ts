@@ -136,7 +136,6 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
       set({
         currentSource: item,
         currentIndex: index,
-        // Set a non-empty sentinel so VideoPlayer doesn't gate on `if (!streamUrl) return null`
         streamUrl: item.path,
         metadata: undefined,
         duration: item.duration || 0,
@@ -146,28 +145,39 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
       return;
     }
 
+    // Clear stale URL immediately
+    set({ streamUrl: undefined });
+
+    // Step 1: Get stream URL and start playback right away — don't block on metadata
+    let url: string;
     try {
-      // Clear any stale streamUrl immediately so VideoPlayer doesn't
-      // briefly show the old track (e.g. a YouTube URL) while loading
-      set({ streamUrl: undefined });
+      url = await window.electronAPI.media.getStreamUrl(item);
+    } catch (err) {
+      console.error("[MediaPlayer] Failed to get stream URL for index", index, err);
+      return;
+    }
 
-      const url = await window.electronAPI.media.getStreamUrl(item);
-      const metadata = await window.electronAPI.media.getMetadata(item.path);
-      const resumePos = await window.electronAPI.media.getResumePosition(item.id);
+    // Commit just enough to start playback immediately
+    set({
+      currentSource: item,
+      currentIndex: index,
+      streamUrl: url,
+      position: 0,
+    });
 
+    // Step 2: Enrich with metadata and resume position — best-effort, failure won't stop playback
+    try {
+      const [metadata, resumePos] = await Promise.all([
+        window.electronAPI.media.getMetadata(item.path),
+        window.electronAPI.media.getResumePosition(item.id),
+      ]);
       set({
-        currentSource: item,
-        currentIndex: index,
-        streamUrl: url,
-        metadata: metadata,
+        metadata,
         duration: metadata.duration || 0,
-        // Only resume if more than 5 seconds in and not at the very end
         position: (resumePos > 5 && resumePos < (metadata.duration || 0) - 10) ? resumePos : 0
       });
-
-      // Only tell Main to play if we aren't already syncing from a play command
     } catch (err) {
-      console.error("[MediaPlayer] Failed to load at index", index, err);
+      console.warn("[MediaPlayer] Metadata fetch failed (ffprobe issue?) — playing without metadata:", err);
     }
   },
 }));

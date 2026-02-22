@@ -362,10 +362,8 @@ async function registerIpcHandlers(): Promise<void> {
     return settingsService?.getSettings().downloadsPath || path.join(app.getPath('videos'), 'GingerPlayer');
   });
 
-  // Background initialization (non-blocking)
-  downloadService?.init().catch(err => {
-    console.error('Failed to initialize DownloadService in background:', err);
-  });
+  // Background initialization already handled in app.on('ready')
+  console.log('[Main] IPC handlers registered.');
 
   // Network Handlers
   ipcMain.handle('network:scan-start', () => {
@@ -457,17 +455,30 @@ if (!gotTheLock) {
 
   // Only start the app if we have the lock
   app.on('ready', async () => {
-    // Allow YouTube iframes — inject a CSP that permits frame-src from YouTube
+    // Allow YouTube iframes — only modify CSP for OUR app's responses
+    // External responses (like YouTube itself) must NOT be modified or their
+    // own CDN resources (googlevideo.com, fonts, scripts) will be blocked too
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-      callback({
-        responseHeaders: {
-          ...details.responseHeaders,
-          'Content-Security-Policy': [
-            "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: http://127.0.0.1:* ws://127.0.0.1:*;" +
-            "frame-src https://www.youtube.com https://www.youtube-nocookie.com;"
-          ]
-        }
-      });
+      const isOurApp =
+        details.url.startsWith('http://localhost') ||
+        details.url.startsWith('http://127.0.0.1') ||
+        details.url.startsWith('file://');
+
+      if (isOurApp) {
+        callback({
+          responseHeaders: {
+            ...details.responseHeaders,
+            'Content-Security-Policy': [
+              "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: http://127.0.0.1:* ws://127.0.0.1:*;" +
+              "frame-src https://www.youtube.com https://www.youtube-nocookie.com;" +
+              "img-src 'self' http://127.0.0.1:* data: https://*.ytimg.com https://i.ytimg.com;"
+            ]
+          }
+        });
+      } else {
+        // Pass through all external responses (YouTube, CDNs, etc.) unchanged
+        callback({ responseHeaders: details.responseHeaders });
+      }
     });
 
     downloadService = new DownloadService();
