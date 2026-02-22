@@ -28,9 +28,24 @@ export class DownloadService {
   getFFprobePath(): string {
     const fileName = process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
     const customPath = path.join(this.binPath, fileName);
-    // Prefer the downloaded binary if it exists, otherwise fall back to the
-    // statically compiled npm package binary (ffprobe-static)
-    return fs.existsSync(customPath) ? customPath : (ffprobeStaticPath || '');
+
+    if (fs.existsSync(customPath)) return customPath;
+
+    let probePath = ffprobeStaticPath;
+
+    // Vite + Electron Forge sometimes incorrectly resolves node_modules paths 
+    // to build-time locations that don't exist in dev. 
+    // If the path looks like it's in .vite/build/ and doesn't exist, we try to fix it.
+    if (probePath && probePath.includes('.vite/build') && !fs.existsSync(probePath)) {
+      const parts = probePath.split('.vite/build');
+      const possibleDevPath = path.join(app.getAppPath(), 'node_modules', 'ffprobe-static', parts[1]);
+      if (fs.existsSync(possibleDevPath)) {
+        console.log('[DownloadService] Fixed ffprobe path from build to dev:', possibleDevPath);
+        return possibleDevPath;
+      }
+    }
+
+    return probePath || '';
   }
 
   getYtDlpPath(): string {
