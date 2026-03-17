@@ -126,8 +126,8 @@ export class MediaServer {
         // Quick check for subtitles
         const metadata = await this.metadataService.getMetadata(filePath);
         if (!metadata.hasSubtitles) {
-            res.status(204).end(); // No Content
-            return;
+          res.status(204).end(); // No Content
+          return;
         }
 
         console.log(`[MediaServer] Extracting subtitles for: ${filePath}`);
@@ -137,11 +137,11 @@ export class MediaServer {
         command.pipe(res, { end: true });
 
         req.on('close', () => {
-            command.kill('SIGKILL');
+          command.kill('SIGKILL');
         });
       } catch (e) {
-          console.error('[MediaServer] Subtitle extraction check failed:', e);
-          res.status(500).send('Error checking subtitles');
+        console.error('[MediaServer] Subtitle extraction check failed:', e);
+        res.status(500).send('Error checking subtitles');
       }
     });
 
@@ -158,24 +158,24 @@ export class MediaServer {
         // Typically DLNA gives HTTP URLs which renderer can play directly.
         // SMB needs proxy.
         // We pass the path relative to current SMB connection.
-        
+
         const stream = await this.networkManager.getSMBStream(url);
-        
+
         // Guess content type or use default
         res.setHeader('Content-Type', 'application/octet-stream');
-        
+
         stream.pipe(res);
-        
+
         stream.on('error', (err) => {
-            console.error('[MediaServer] Proxy stream error:', err);
-            if (!res.headersSent) res.status(500).end();
+          console.error('[MediaServer] Proxy stream error:', err);
+          if (!res.headersSent) res.status(500).end();
         });
-        
+
         req.on('close', () => {
-            // stream.destroy? Readable stream might not have destroy in all versions but usually yes.
-            if (typeof (stream as any).destroy === 'function') {
-                (stream as any).destroy();
-            }
+          // stream.destroy? Readable stream might not have destroy in all versions but usually yes.
+          if (typeof (stream as any).destroy === 'function') {
+            (stream as any).destroy();
+          }
         });
 
       } catch (err) {
@@ -183,49 +183,49 @@ export class MediaServer {
         res.status(500).send('Proxy failed');
       }
     });
-    
+
     // 6. Thumbnails (resized for gallery performance)
     this.app.get('/thumbnail', async (req, res) => {
-        const filePath = req.query.path as string;
-        if (!filePath || !fs.existsSync(filePath)) {
-            res.status(404).send('File not found');
-            return;
-        }
+      const filePath = req.query.path as string;
+      if (!filePath || !fs.existsSync(filePath)) {
+        res.status(404).send('File not found');
+        return;
+      }
 
-        const thumbDir = path.join(app.getPath('userData'), 'thumbnails');
-        if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
+      const thumbDir = path.join(app.getPath('userData'), 'thumbnails');
+      if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, { recursive: true });
 
-        // Create stable hash for cache key
-        const hash = crypto.createHash('md5').update(filePath).digest('hex');
-        const thumbPath = path.join(thumbDir, `${hash}.jpg`);
+      // Create stable hash for cache key
+      const hash = crypto.createHash('md5').update(filePath).digest('hex');
+      const thumbPath = path.join(thumbDir, `${hash}.jpg`);
 
-        if (fs.existsSync(thumbPath)) {
-            res.sendFile(thumbPath);
-            return;
-        }
+      if (fs.existsSync(thumbPath)) {
+        res.sendFile(thumbPath);
+        return;
+      }
 
-        try {
-            console.log(`[MediaServer] Generating thumbnail for: ${filePath}`);
-            // Generate thumbnail using ffmpeg
-            this.transcoder.createThumbnail(filePath)
-                .on('end', () => {
-                    console.log(`[MediaServer] Thumbnail generated: ${thumbPath}`);
-                    if (!res.headersSent) res.sendFile(thumbPath);
-                })
-                .on('error', (err: Error) => {
-                    console.error(`[MediaServer] FFmpeg thumbnail error for ${filePath}:`, err.message);
-                    if (!res.headersSent) res.status(500).send('Failed to generate thumbnail');
-                })
-                .save(thumbPath);
-        } catch (e: any) {
-            console.error('[MediaServer] Thumbnail service exception:', e);
-            res.status(500).send('Thumbnail service failed');
-        }
+      try {
+        console.log(`[MediaServer] Generating thumbnail for: ${filePath}`);
+        // Generate thumbnail using ffmpeg
+        this.transcoder.createThumbnail(filePath)
+          .on('end', () => {
+            console.log(`[MediaServer] Thumbnail generated: ${thumbPath}`);
+            if (!res.headersSent) res.sendFile(thumbPath);
+          })
+          .on('error', (err: Error) => {
+            console.error(`[MediaServer] FFmpeg thumbnail error for ${filePath}:`, err.message);
+            if (!res.headersSent) res.status(500).send('Failed to generate thumbnail');
+          })
+          .save(thumbPath);
+      } catch (e: any) {
+        console.error('[MediaServer] Thumbnail service exception:', e);
+        res.status(500).send('Thumbnail service failed');
+      }
     });
 
     // 7. App Logo
     this.app.get('/logo', (_req, res) => {
-      const logoPath = path.join(app.getAppPath(), 'logo.png');
+      const logoPath = path.join(process.resourcesPath, 'logo.png');
       if (fs.existsSync(logoPath)) {
         res.sendFile(logoPath);
       } else {

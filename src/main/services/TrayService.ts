@@ -35,7 +35,7 @@ export class TrayService {
     // logo.png is in the project root
     // In dev: __dirname is src/main/services, logo is ../../logo.png
     // In prod: process.resourcesPath or similar might be needed, but for now let's use absolute if possible or relative to app path
-    return path.join(app.getAppPath(), 'logo.png');
+    return path.join(process.resourcesPath, 'logo.png');
   }
 
   private updateContextMenu() {

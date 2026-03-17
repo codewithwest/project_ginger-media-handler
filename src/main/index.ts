@@ -76,7 +76,7 @@ const createWindow = (): void => {
       preload: path.join(__dirname, 'preload.js'),
     },
     titleBarStyle: 'hidden',
-    icon: path.join(app.getAppPath(), 'logo.png'),
+    icon: path.join(process.resourcesPath, 'logo.png'),
   });
 
   // Log loading failures
