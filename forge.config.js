@@ -9,14 +9,39 @@ const config = {
    packagerConfig: {
       asar: true,
       executableName: 'ginger-media-handler',
-      extraResource: ['./docs', './logo.png'],
-      icon: './logo',
+      extraResource: ['./docs', './public/images/logo.png'],
+      icon: './public/images/logo.png',
+      ignore: (path) => {
+         if (!path || path.includes('node_modules/electron-updater')) {
+            return false;
+         }
+         return false;
+      },
    },
    rebuildConfig: {},
    makers: [
       new MakerSquirrel({}),
       new MakerZIP({}, ['darwin']),
-      new MakerDeb({}),
+      new MakerDeb({
+         options: {
+            bin: 'ginger-media-handler',
+            icon: './public/images/logo.png',
+            depends: [
+               'libnss3',
+               'libatk1.0-0',
+               'libatk-bridge2.0-0',
+               'libcups2',
+               'libgtk-3-0',
+               'libgbm1',
+               'libasound2'
+            ],
+            categories: ['Utility', 'AudioVideo'],
+            genericName: 'Ginger Media Handler',
+            productName: 'Ginger Media Handler',
+            section: 'video',
+            mimeType: ['x-scheme-handler/ginger-media-handler'],
+         },
+      }),
    ],
    plugins: [
       new VitePlugin({

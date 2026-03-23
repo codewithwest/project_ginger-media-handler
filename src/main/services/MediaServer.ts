@@ -225,7 +225,9 @@ export class MediaServer {
 
     // 7. App Logo
     this.app.get('/logo', (_req, res) => {
-      const logoPath = path.join(process.resourcesPath, 'logo.png');
+      const logoPath = app.isPackaged 
+        ? path.join(process.resourcesPath, 'logo.png')
+        : path.join(app.getAppPath(), 'public', 'images', 'logo.png');
       if (fs.existsSync(logoPath)) {
         res.sendFile(logoPath);
       } else {
