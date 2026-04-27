@@ -50,7 +50,7 @@ const getMediaType = (path: string): 'audio' | 'video' | 'image' => {
 };
 
 export function App() {
-  const { addToPlaylist, playAtIndex, playlist, status, streamUrl, currentSource } = useMediaPlayerStore();
+  const { addToPlaylist, playAtIndex, playlist, status, streamUrl, currentSource, play, pause } = useMediaPlayerStore();
   const { syncJobs, initializeListeners } = useJobsStore();
   const { tabs: pluginTabs, init: initPlugins } = usePluginStore();
   const { init: initProviders } = useProviderStore();
@@ -62,6 +62,7 @@ export function App() {
   const [showQueue, setShowQueue] = useState(true);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [zenMode, setZenMode] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState('auto');
 
   useEffect(() => {
     // Initialize Media Player (Sync with Main Process)
@@ -100,6 +101,27 @@ export function App() {
     };
   }, []);
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+      if (isTyping) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault(); // stop page scroll
+        if (status === 'playing') {
+          pause();
+        } else {
+          play();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [status, play, pause]);
+
   const handleOpenFiles = async () => {
     const files = (await window.electronAPI.file.openDialog()) as string[];
     if (files && files.length > 0) {
@@ -110,10 +132,10 @@ export function App() {
         path: filePath,
         title: filePath.split('/').pop()
       }));
-      newItems.forEach(item => addToPlaylist(item));
-      if (status === 'stopped' || playlist.length === 0) {
-        playAtIndex(playlist.length);
-      }
+      // First file: add AND play immediately (playNow=true → Main calls play() right away)
+      addToPlaylist(newItems[0], true);
+      // Any extra files in the same selection go to the queue only
+      newItems.slice(1).forEach(item => addToPlaylist(item));
     }
   };
 
@@ -272,7 +294,7 @@ export function App() {
             `}>
               {streamUrl ? (
                 <div className="w-full h-full relative">
-                  <VideoPlayer key={streamUrl} />
+                  <VideoPlayer key={streamUrl} aspectRatio={aspectRatio} />
                 </div>
               ) : (
                 /* Premium Placeholder - only shown when on player tab and no track is playing */
@@ -368,6 +390,8 @@ export function App() {
             onToggleEqualizer={() => setShowEqualizer(!showEqualizer)}
             zenMode={zenMode}
             onToggleZenMode={() => setZenMode(!zenMode)}
+            aspectRatio={aspectRatio}
+            onAspectRatioChange={setAspectRatio}
           />
         </div>
       </div>
