@@ -1,6 +1,6 @@
 # 🎬 Ginger Media v1.0.8 - The Video Controls Update
 
-Version 1.0.8 brings a significant upgrade to the video playback experience, introducing full VLC-style controls for stopping, full-screening, and reshaping media — all without leaving the player.
+Version 1.0.8 is a comprehensive upgrade to the video playback experience. It introduces VLC-style media controls, a premium fullscreen overlay, keyboard shortcuts, smarter file handling, and a polish pass across the entire player UI.
 
 ## ✨ New Features
 
@@ -28,6 +28,25 @@ Version 1.0.8 brings a significant upgrade to the video playback experience, int
   | **Crop** | Scales and crops to fill without distortion |
 - **Highlighted State**: The button turns accent-blue when any non-Auto ratio is active, so you can tell at a glance that a custom ratio is applied.
 - **Dropdown Menu**: Selecting a ratio from the floating menu applies it instantly with no reload required.
+
+### 🖥️ Premium Fullscreen Controls Overlay
+- **Auto-Hiding HUD**: When a video enters fullscreen a polished controls overlay appears at the bottom of the screen. It fades out automatically after **3.5 seconds** of inactivity and reappears the moment the mouse moves.
+- **Cursor Management**: The mouse cursor turns invisible alongside the controls, giving a true cinema feel. Moving the mouse restores both immediately.
+- **Three-Zone Layout**: The overlay is divided into a clear hierarchy — track title & folder name at the top, a full-width seek bar in the middle, and transport + volume at the bottom.
+- **Glowing 76 px Play Button**: The primary play/pause button scales up significantly in fullscreen with a white halo ring effect.
+- **Custom Seek & Volume Tracks**: Both sliders render a custom filled track with a glowing white progress bar — the native browser thumb is hidden and an invisible `<input>` handles interaction on top.
+- **Volume Percentage Readout**: The volume percentage (`75%`) is displayed live next to the slider.
+- **Exit Fullscreen Button**: A labelled pill button (`Exit Fullscreen`) sits in the bottom-right corner of the overlay for discoverability.
+- **Deep Gradient Scrim**: A `from-black via-black/75` gradient covers the lower half of the frame so controls remain readable over any video.
+
+### ⌨️ Space Bar Play / Pause
+- **Global Keyboard Shortcut**: Pressing **Space** anywhere in the app toggles play/pause instantly.
+- **Input-Aware**: The shortcut is suppressed when focus is inside an `<input>`, `<textarea>`, or any `contentEditable` element, so typing is never interrupted.
+
+### 📂 Instant Auto-Play on File Open
+- **Open = Play**: Picking a file via the **Open Media** dialog now immediately starts playback of the first selected file, regardless of whether something was already playing.
+- **Multi-File Selection**: When multiple files are chosen at once, the first file plays immediately and the rest are appended to the queue — no manual action required.
+- The previous behaviour (only auto-playing when the player was stopped and the playlist was empty) has been removed.
 
 ## 🛠️ Stability & Bug Fixes
 
