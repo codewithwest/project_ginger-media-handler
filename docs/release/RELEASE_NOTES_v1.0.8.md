@@ -54,6 +54,9 @@ Version 1.0.8 is a comprehensive upgrade to the video playback experience. It in
 - **Object-fit Consistency**: Removed duplicate Tailwind `object-contain` class conflicts when switching between forced and auto aspect ratios.
 - **Container ID**: The video player container now has a stable `id="video-player-container"`, which both the fullscreen handler and future overlay features can reliably target.
 
+### 🔲 Fullscreen State Sync
+- **Esc Key Desync Fixed**: Previously, pressing Esc to exit fullscreen left the Fullscreen button showing the wrong icon. A `fullscreenchange` event listener now keeps the icon state (`Maximize` ↔ `Minimize`) in sync with the actual browser fullscreen state at all times.
+
 ### ⚡ Build & Dependencies
 - **Vite Patches**: Applied `npm audit fix` to address high-severity Vite dev-server vulnerabilities (`GHSA-4w7w-66w2-5vf9`, `GHSA-v2wj-q39q-566r`, `GHSA-p9ff-h696-f583`).
 - **Undici Update**: Resolved multiple high-severity undici WebSocket and HTTP smuggling advisories.
