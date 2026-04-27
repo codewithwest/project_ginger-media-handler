@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { Play, Pause, SkipForward, SkipBack, Shuffle, Repeat, Volume2, VolumeX, Maximize, ListMusic, SlidersHorizontal, Gauge, EyeOff } from 'lucide-react';
+import { Play, Pause, Square, SkipForward, SkipBack, Shuffle, Repeat, Volume2, VolumeX, Maximize, Minimize, ListMusic, SlidersHorizontal, Gauge, EyeOff, Crop } from 'lucide-react';
 import { useMediaPlayerStore } from '../../state/media-player';
 import { Tooltip } from '../ui/Tooltip';
 
@@ -9,14 +9,28 @@ interface PlayerControlsProps {
   onToggleEqualizer?: () => void;
   zenMode?: boolean;
   onToggleZenMode?: () => void;
+  aspectRatio?: string;
+  onAspectRatioChange?: (ratio: string) => void;
 }
+
+const ASPECT_RATIOS = [
+  { label: 'Auto', value: 'auto' },
+  { label: '16:9', value: '16:9' },
+  { label: '4:3', value: '4:3' },
+  { label: '1:1', value: '1:1' },
+  { label: '21:9', value: '21:9' },
+  { label: 'Fill', value: 'fill' },
+  { label: 'Crop', value: 'cover' },
+];
 
 export function PlayerControls({
   onToggleQueue,
   queueVisible,
   onToggleEqualizer,
   zenMode,
-  onToggleZenMode
+  onToggleZenMode,
+  aspectRatio = 'auto',
+  onAspectRatioChange,
 }: PlayerControlsProps) {
   const {
     status,
@@ -29,6 +43,7 @@ export function PlayerControls({
     duration,
     play,
     pause,
+    stop,
     seek,
     next,
     previous,
@@ -39,6 +54,8 @@ export function PlayerControls({
     playbackSpeed,
     setSpeed,
   } = useMediaPlayerStore();
+
+  const [showAspectMenu, setShowAspectMenu] = useState(false);
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragValue, setDragValue] = useState(0);
@@ -89,9 +106,21 @@ export function PlayerControls({
     }
   };
 
-  const handleToggleFullScreen = () => {
-    window.electronAPI.window.toggleFullScreen();
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const handleToggleFullScreen = async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      setIsFullScreen(false);
+    } else {
+      const container = document.getElementById('video-player-container');
+      const target = container ?? document.documentElement;
+      await target.requestFullscreen();
+      setIsFullScreen(true);
+    }
   };
+
+  const isVideo = currentSource?.mediaType === 'video';
 
   const getValidPosition = (val: number, dur: number) => {
     if (isNaN(val) || !isFinite(val)) return 0;
@@ -194,13 +223,22 @@ export function PlayerControls({
         </div>
 
         {/* Center: Main controls */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
           <Tooltip content="Previous" position="top">
             <button
               onClick={previous}
               className="p-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-all duration-300 transform active:scale-90"
             >
               <SkipBack className="w-6 h-6 fill-current" />
+            </button>
+          </Tooltip>
+
+          <Tooltip content="Stop" position="top">
+            <button
+              onClick={stop}
+              className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all duration-300 active:scale-90"
+            >
+              <Square className="w-5 h-5 fill-current" />
             </button>
           </Tooltip>
 
@@ -282,12 +320,46 @@ export function PlayerControls({
             </button>
           </Tooltip>
 
-          <Tooltip content="Full Screen" position="top">
+          {/* Aspect Ratio - only for video */}
+          {isVideo && (
+            <div className="relative">
+              <Tooltip content="Aspect Ratio" position="top">
+                <button
+                  onClick={() => setShowAspectMenu(v => !v)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all border text-[10px] font-bold font-mono
+                    ${aspectRatio !== 'auto'
+                      ? 'text-primary-400 bg-primary-500/10 border-primary-500/30'
+                      : 'text-gray-500 hover:text-gray-300 bg-white/5 hover:bg-white/10 border-white/5'}`}
+                >
+                  <Crop className="w-3 h-3" />
+                  <span>{ASPECT_RATIOS.find(r => r.value === aspectRatio)?.label ?? 'Auto'}</span>
+                </button>
+              </Tooltip>
+              {showAspectMenu && (
+                <div className="absolute bottom-full mb-2 right-0 glass-dark border border-white/10 rounded-xl overflow-hidden shadow-2xl z-[100] animate-in fade-in zoom-in-95 duration-150">
+                  {ASPECT_RATIOS.map(r => (
+                    <button
+                      key={r.value}
+                      onClick={() => { onAspectRatioChange?.(r.value); setShowAspectMenu(false); }}
+                      className={`w-full px-4 py-2 text-left text-xs font-mono transition-colors
+                        ${aspectRatio === r.value
+                          ? 'bg-primary-500/20 text-primary-300'
+                          : 'text-gray-300 hover:bg-white/10 hover:text-white'}`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <Tooltip content={isFullScreen ? 'Exit Full Screen' : 'Full Screen'} position="top">
             <button
               onClick={handleToggleFullScreen}
               className="p-2 text-gray-500 hover:text-gray-300 hover:bg-white/5 rounded-xl transition-all"
             >
-              <Maximize className="w-4 h-4" />
+              {isFullScreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
           </Tooltip>
 

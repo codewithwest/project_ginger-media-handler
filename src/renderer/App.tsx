@@ -62,6 +62,7 @@ export function App() {
   const [showQueue, setShowQueue] = useState(true);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [zenMode, setZenMode] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState('auto');
 
   useEffect(() => {
     // Initialize Media Player (Sync with Main Process)
@@ -272,7 +273,7 @@ export function App() {
             `}>
               {streamUrl ? (
                 <div className="w-full h-full relative">
-                  <VideoPlayer key={streamUrl} />
+                  <VideoPlayer key={streamUrl} aspectRatio={aspectRatio} />
                 </div>
               ) : (
                 /* Premium Placeholder - only shown when on player tab and no track is playing */
@@ -368,6 +369,8 @@ export function App() {
             onToggleEqualizer={() => setShowEqualizer(!showEqualizer)}
             zenMode={zenMode}
             onToggleZenMode={() => setZenMode(!zenMode)}
+            aspectRatio={aspectRatio}
+            onAspectRatioChange={setAspectRatio}
           />
         </div>
       </div>

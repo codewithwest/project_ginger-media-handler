@@ -1,10 +1,30 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { CSSProperties, useEffect, useRef, useState } from 'react';
 import { useMediaPlayerStore } from '../../state/media-player';
 import { useAudioEngine } from '../../state/audio-engine';
 import { Visualizer } from './Visualizer';
 
-export function VideoPlayer() {
+interface VideoPlayerProps {
+  aspectRatio?: string;
+}
+
+export function VideoPlayer({ aspectRatio = 'auto' }: VideoPlayerProps) {
+
+  const getVideoStyle = (): CSSProperties => {
+    switch (aspectRatio) {
+      case '16:9': return { objectFit: 'fill', aspectRatio: '16 / 9', maxWidth: '100%', maxHeight: '100%' };
+      case '4:3':  return { objectFit: 'fill', aspectRatio: '4 / 3',  maxWidth: '100%', maxHeight: '100%' };
+      case '1:1':  return { objectFit: 'fill', aspectRatio: '1 / 1',  maxWidth: '100%', maxHeight: '100%' };
+      case '21:9': return { objectFit: 'fill', aspectRatio: '21 / 9', maxWidth: '100%', maxHeight: '100%' };
+      case 'fill': return { objectFit: 'fill',    width: '100%', height: '100%' };
+      case 'cover': return { objectFit: 'cover',  width: '100%', height: '100%' };
+      default:     return { objectFit: 'contain', maxWidth: '100%', maxHeight: '100%' };
+    }
+  };
+
+  const videoClass = (aspectRatio === 'fill' || aspectRatio === 'cover')
+    ? 'shadow-2xl z-10'
+    : 'max-w-full max-h-full shadow-2xl z-10';
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const {
@@ -150,7 +170,7 @@ export function VideoPlayer() {
   if (!streamUrl) return null;
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden relative group">
+    <div id="video-player-container" className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden relative group">
       {/* Background/Visualizer layer */}
       {currentSource?.path && !currentSource.path.toLowerCase().endsWith('.mp4') && (
         <div className="absolute inset-0 flex items-center justify-center opacity-80 pointer-events-none z-0">
@@ -164,7 +184,8 @@ export function VideoPlayer() {
         ref={videoRef}
         src={streamUrl}
         crossOrigin="anonymous"
-        className="max-w-full max-h-full object-contain shadow-2xl z-10"
+        className={videoClass}
+        style={getVideoStyle()}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={handleEnded}
