@@ -255,69 +255,127 @@ export function VideoPlayer({ aspectRatio = 'auto' }: VideoPlayerProps) {
       {isFullScreen && (
         <div
           className={`absolute inset-x-0 bottom-0 z-50 transition-all duration-500 ease-in-out select-none
-            ${controlsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'}`}
+            ${controlsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
         >
-          {/* Gradient scrim */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
+          {/* Deep gradient scrim covering bottom ~50% */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/75 to-transparent pointer-events-none" />
 
-          <div className="relative px-8 pt-16 pb-5 flex flex-col gap-3">
-            {/* Track title */}
-            <p className="text-white/90 text-sm font-semibold truncate drop-shadow">
-              {currentSource?.title ?? 'Unknown Track'}
-            </p>
+          <div className="relative flex flex-col gap-7 px-16 pb-12 pt-28">
 
-            {/* Seek bar */}
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-gray-400 font-mono w-10 text-right shrink-0">{formatTime(position)}</span>
-              <input
-                type="range" min={0} max={duration || 0} step={0.1}
-                value={isFinite(position) ? position : 0}
-                onChange={e => seek(parseFloat(e.target.value))}
-                className="flex-1 h-1 rounded-full accent-white cursor-pointer"
-              />
-              <span className="text-[11px] text-gray-400 font-mono w-10 shrink-0">{formatTime(duration)}</span>
+            {/* Zone 1 – Track info */}
+            <div className="flex flex-col gap-1.5">
+              <p
+                className="text-white text-3xl font-bold tracking-tight truncate"
+                style={{ textShadow: '0 2px 16px rgba(0,0,0,0.9)' }}
+              >
+                {currentSource?.title ?? 'Unknown Track'}
+              </p>
+              <p className="text-white/45 text-base font-medium truncate">
+                {currentSource?.path?.split('/').slice(-2, -1)[0] ?? ''}
+              </p>
             </div>
 
-            {/* Controls row */}
+            {/* Zone 2 – Seek bar with custom rendered track */}
+            <div className="flex items-center gap-6 w-full">
+              <span className="text-sm text-white/55 font-mono tabular-nums w-12 text-right shrink-0">
+                {formatTime(position)}
+              </span>
+              <div className="flex-1 relative h-6 flex items-center">
+                {/* Visual track (non-interactive) */}
+                <div className="absolute w-full h-2 bg-white/15 rounded-full overflow-hidden pointer-events-none">
+                  <div
+                    className="h-full bg-white rounded-full transition-all duration-100"
+                    style={{
+                      width: `${duration > 0 ? Math.min(100, (position / duration) * 100) : 0}%`,
+                      boxShadow: '0 0 10px rgba(255,255,255,0.5)',
+                    }}
+                  />
+                </div>
+                {/* Invisible range input sits on top for interaction */}
+                <input
+                  type="range" min={0} max={duration || 0} step={0.1}
+                  value={isFinite(position) ? position : 0}
+                  onChange={e => seek(parseFloat(e.target.value))}
+                  className="absolute w-full h-6 opacity-0 cursor-pointer z-10"
+                />
+              </div>
+              <span className="text-sm text-white/55 font-mono tabular-nums w-12 shrink-0">
+                {formatTime(duration)}
+              </span>
+            </div>
+
+            {/* Zone 3 – Transport (left) + Volume & Exit (right) */}
             <div className="flex items-center justify-between">
+
               {/* Transport */}
-              <div className="flex items-center gap-5">
-                <button onClick={previous} className="text-white/70 hover:text-white transition-colors active:scale-90">
-                  <SkipBack className="w-5 h-5 fill-current" />
+              <div className="flex items-center gap-9">
+                <button
+                  onClick={previous}
+                  className="p-2 text-white/55 hover:text-white transition-all duration-200 hover:scale-110 active:scale-90"
+                >
+                  <SkipBack className="w-8 h-8 fill-current" />
                 </button>
-                <button onClick={stop} className="text-white/60 hover:text-red-400 transition-colors active:scale-90">
-                  <Square className="w-4 h-4 fill-current" />
+
+                <button
+                  onClick={stop}
+                  className="p-2 text-white/45 hover:text-red-400 transition-all duration-200 hover:scale-110 active:scale-90"
+                >
+                  <Square className="w-6 h-6 fill-current" />
                 </button>
+
+                {/* Primary play/pause – 72 px glowing pill */}
                 <button
                   onClick={() => status === 'playing' ? pause() : play()}
-                  className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform"
+                  className="w-[76px] h-[76px] rounded-full bg-white text-black flex items-center justify-center
+                    hover:scale-105 active:scale-95 transition-all duration-200"
+                  style={{ boxShadow: '0 0 0 10px rgba(255,255,255,0.10), 0 10px 40px rgba(0,0,0,0.6)' }}
                 >
                   {status === 'playing'
-                    ? <Pause className="w-5 h-5 fill-current" />
-                    : <Play  className="w-5 h-5 ml-0.5 fill-current" />}
+                    ? <Pause className="w-8 h-8 fill-current" />
+                    : <Play  className="w-8 h-8 ml-1 fill-current" />}
                 </button>
-                <button onClick={next} className="text-white/70 hover:text-white transition-colors active:scale-90">
-                  <SkipForward className="w-5 h-5 fill-current" />
+
+                <button
+                  onClick={next}
+                  className="p-2 text-white/55 hover:text-white transition-all duration-200 hover:scale-110 active:scale-90"
+                >
+                  <SkipForward className="w-8 h-8 fill-current" />
                 </button>
               </div>
 
               {/* Volume + Exit */}
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Volume2 className="w-4 h-4 text-white/60" />
-                  <input
-                    type="range" min={0} max={1} step={0.02}
-                    value={volume}
-                    onChange={e => setVolume(parseFloat(e.target.value))}
-                    className="w-24 h-1 rounded-full accent-white cursor-pointer"
-                  />
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3">
+                  <Volume2 className="w-5 h-5 text-white/45 shrink-0" />
+                  <div className="relative w-36 h-6 flex items-center">
+                    <div className="absolute w-full h-1.5 bg-white/15 rounded-full overflow-hidden pointer-events-none">
+                      <div
+                        className="h-full bg-white/75 rounded-full"
+                        style={{ width: `${Math.round(volume * 100)}%` }}
+                      />
+                    </div>
+                    <input
+                      type="range" min={0} max={1} step={0.02}
+                      value={volume}
+                      onChange={e => setVolume(parseFloat(e.target.value))}
+                      className="absolute w-full h-6 opacity-0 cursor-pointer z-10"
+                    />
+                  </div>
+                  <span className="text-sm text-white/40 font-mono tabular-nums w-10">
+                    {Math.round(volume * 100)}%
+                  </span>
                 </div>
+
+                <div className="w-px h-7 bg-white/15" />
+
                 <button
                   onClick={() => document.exitFullscreen()}
-                  className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                  title="Exit Fullscreen"
+                  className="flex items-center gap-2.5 px-5 py-2.5 text-white/60 hover:text-white
+                    bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/25
+                    rounded-xl transition-all duration-200 text-sm font-semibold"
                 >
                   <Minimize className="w-4 h-4" />
+                  <span>Exit Fullscreen</span>
                 </button>
               </div>
             </div>
