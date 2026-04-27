@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { Play, Pause, Square, SkipForward, SkipBack, Shuffle, Repeat, Volume2, VolumeX, Maximize, Minimize, ListMusic, SlidersHorizontal, Gauge, EyeOff, Crop } from 'lucide-react';
 import { useMediaPlayerStore } from '../../state/media-player';
 import { Tooltip } from '../ui/Tooltip';
@@ -107,6 +107,13 @@ export function PlayerControls({
   };
 
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Keep isFullScreen in sync when user exits via Esc key
+  useEffect(() => {
+    const onFSChange = () => setIsFullScreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFSChange);
+    return () => document.removeEventListener('fullscreenchange', onFSChange);
+  }, []);
 
   const handleToggleFullScreen = async () => {
     if (document.fullscreenElement) {

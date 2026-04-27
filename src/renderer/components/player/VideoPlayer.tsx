@@ -1,5 +1,6 @@
 
-import { CSSProperties, useEffect, useRef, useState } from 'react';
+import { CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
+import { Play, Pause, Square, SkipBack, SkipForward, Volume2, Minimize } from 'lucide-react';
 import { useMediaPlayerStore } from '../../state/media-player';
 import { useAudioEngine } from '../../state/audio-engine';
 import { Visualizer } from './Visualizer';
@@ -32,13 +33,54 @@ export function VideoPlayer({ aspectRatio = 'auto' }: VideoPlayerProps) {
     status,
     volume,
     position,
+    duration,
     syncTime,
     play,
     pause,
+    stop,
+    seek,
     next,
+    previous,
+    setVolume,
     currentSource,
     playbackSpeed,
   } = useMediaPlayerStore();
+
+  // --- Fullscreen controls visibility ---
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const onFSChange = () => setIsFullScreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFSChange);
+    return () => document.removeEventListener('fullscreenchange', onFSChange);
+  }, []);
+
+  const scheduleHide = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setControlsVisible(false), 3500);
+  }, []);
+
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    scheduleHide();
+  }, [scheduleHide]);
+
+  useEffect(() => {
+    if (isFullScreen) {
+      revealControls();
+    } else {
+      setControlsVisible(true);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    }
+    return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
+  }, [isFullScreen]);
+
+  const formatTime = (s: number) => {
+    if (!s || !isFinite(s) || isNaN(s)) return '0:00';
+    return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+  };
 
   // Sync Play/Pause/Stop status
   useEffect(() => {
@@ -170,7 +212,11 @@ export function VideoPlayer({ aspectRatio = 'auto' }: VideoPlayerProps) {
   if (!streamUrl) return null;
 
   return (
-    <div id="video-player-container" className="w-full h-full flex items-center justify-center bg-transparent overflow-hidden relative group">
+    <div
+      id="video-player-container"
+      className={`w-full h-full flex items-center justify-center bg-transparent overflow-hidden relative group ${isFullScreen && !controlsVisible ? 'cursor-none' : ''}`}
+      onMouseMove={isFullScreen ? revealControls : undefined}
+    >
       {/* Background/Visualizer layer */}
       {currentSource?.path && !currentSource.path.toLowerCase().endsWith('.mp4') && (
         <div className="absolute inset-0 flex items-center justify-center opacity-80 pointer-events-none z-0">
@@ -204,6 +250,80 @@ export function VideoPlayer({ aspectRatio = 'auto' }: VideoPlayerProps) {
       </video>
 
       {/* Bottom Visualizer Strip removed in favor of central one for circular design */}
+
+      {/* ── Fullscreen Controls Overlay ── */}
+      {isFullScreen && (
+        <div
+          className={`absolute inset-x-0 bottom-0 z-50 transition-all duration-500 ease-in-out select-none
+            ${controlsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'}`}
+        >
+          {/* Gradient scrim */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
+
+          <div className="relative px-8 pt-16 pb-5 flex flex-col gap-3">
+            {/* Track title */}
+            <p className="text-white/90 text-sm font-semibold truncate drop-shadow">
+              {currentSource?.title ?? 'Unknown Track'}
+            </p>
+
+            {/* Seek bar */}
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-gray-400 font-mono w-10 text-right shrink-0">{formatTime(position)}</span>
+              <input
+                type="range" min={0} max={duration || 0} step={0.1}
+                value={isFinite(position) ? position : 0}
+                onChange={e => seek(parseFloat(e.target.value))}
+                className="flex-1 h-1 rounded-full accent-white cursor-pointer"
+              />
+              <span className="text-[11px] text-gray-400 font-mono w-10 shrink-0">{formatTime(duration)}</span>
+            </div>
+
+            {/* Controls row */}
+            <div className="flex items-center justify-between">
+              {/* Transport */}
+              <div className="flex items-center gap-5">
+                <button onClick={previous} className="text-white/70 hover:text-white transition-colors active:scale-90">
+                  <SkipBack className="w-5 h-5 fill-current" />
+                </button>
+                <button onClick={stop} className="text-white/60 hover:text-red-400 transition-colors active:scale-90">
+                  <Square className="w-4 h-4 fill-current" />
+                </button>
+                <button
+                  onClick={() => status === 'playing' ? pause() : play()}
+                  className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform"
+                >
+                  {status === 'playing'
+                    ? <Pause className="w-5 h-5 fill-current" />
+                    : <Play  className="w-5 h-5 ml-0.5 fill-current" />}
+                </button>
+                <button onClick={next} className="text-white/70 hover:text-white transition-colors active:scale-90">
+                  <SkipForward className="w-5 h-5 fill-current" />
+                </button>
+              </div>
+
+              {/* Volume + Exit */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-white/60" />
+                  <input
+                    type="range" min={0} max={1} step={0.02}
+                    value={volume}
+                    onChange={e => setVolume(parseFloat(e.target.value))}
+                    className="w-24 h-1 rounded-full accent-white cursor-pointer"
+                  />
+                </div>
+                <button
+                  onClick={() => document.exitFullscreen()}
+                  className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  title="Exit Fullscreen"
+                >
+                  <Minimize className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
