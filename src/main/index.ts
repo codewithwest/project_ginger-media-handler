@@ -5,6 +5,7 @@ import { app, BrowserWindow, ipcMain, dialog, globalShortcut, session } from 'el
 interface ExtendedApp extends Electron.App {
   isQuitting?: boolean;
 }
+import fs from 'fs';
 import path from 'path';
 import { MediaServer } from './services/MediaServer';
 import { TrayService } from './services/TrayService';
@@ -312,6 +313,40 @@ async function registerIpcHandlers(): Promise<void> {
       ],
     });
     return result.canceled ? null : result.filePaths;
+  });
+
+  ipcMain.handle('file:open-folder-dialog', async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'multiSelections'],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) return null;
+
+    const mediaFiles: string[] = [];
+    const validExtensions = new Set(['.mp3', '.mp4', '.mkv', '.avi', '.flac', '.wav', '.webm', '.m4a', '.ogg']);
+
+    const scanDirectory = async (dir: string) => {
+      try {
+        const dirents = await fs.promises.readdir(dir, { withFileTypes: true });
+        for (const dirent of dirents) {
+          const res = path.resolve(dir, dirent.name);
+          if (dirent.isDirectory()) {
+            await scanDirectory(res);
+          } else if (validExtensions.has(path.extname(res).toLowerCase())) {
+            mediaFiles.push(res);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to scan directory:', err);
+      }
+    };
+
+    for (const dir of result.filePaths) {
+      await scanDirectory(dir);
+    }
+
+    return mediaFiles;
   });
 
   // Job management

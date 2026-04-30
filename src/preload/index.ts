@@ -82,6 +82,8 @@ const electronAPI = {
   file: {
     openDialog: () =>
       ipcRenderer.invoke('file:open-dialog'),
+    openFolderDialog: () =>
+      ipcRenderer.invoke('file:open-folder-dialog'),
     addToPlaylist: (paths: string[]) =>
       ipcRenderer.invoke('file:add-to-playlist', { paths }),
     onFileOpenFromCLI: (callback: (path: string) => void) => {

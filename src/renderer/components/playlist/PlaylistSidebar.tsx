@@ -2,8 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { useMediaPlayerStore } from '../../state/media-player';
 import { usePlaylistStore } from '../../state/playlists';
-import { Trash2, ListMusic, Plus, Download, Bookmark, Edit2, Check, Save } from 'lucide-react';
+import { Trash2, ListMusic, Plus, Download, Bookmark, Edit2, Check, Save, FolderPlus, FolderOpen } from 'lucide-react';
 import type { MediaSource, PlaylistMetadata } from '../../../shared/types/media';
+import { FileTree, useFileTree } from '@pierre/trees/react';
+
+const getMediaType = (filePath: string): 'audio' | 'video' | 'image' => {
+  const ext = filePath.split('.').pop()?.toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '')) return 'image';
+  if (['mp4', 'mkv', 'avi', 'mov', 'webm', 'wmv'].includes(ext || '')) return 'video';
+  return 'audio'; // Default
+};
 
 export function PlaylistSidebar() {
   const {
@@ -25,7 +33,8 @@ export function PlaylistSidebar() {
     updateItems,
   } = usePlaylistStore();
 
-  const [view, setView] = useState<'queue' | 'library'>('queue');
+  const [view, setView] = useState<'queue' | 'library' | 'explorer'>('queue');
+  const [explorerPaths, setExplorerPaths] = useState<string[]>([]);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [downloadsPath, setDownloadsPath] = useState('');
@@ -33,6 +42,28 @@ export function PlaylistSidebar() {
   const [editName, setEditName] = useState('');
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [showCreateInput, setShowCreateInput] = useState(false);
+
+  const treePaths = React.useMemo(() => {
+    return explorerPaths.map(p => {
+      const type = getMediaType(p);
+      const folderName = type === 'audio' ? 'Audio' : type === 'video' ? 'Video' : 'Images';
+      return `${folderName}${p}`;
+    });
+  }, [explorerPaths]);
+
+  const { model: treeModel } = useFileTree({
+    paths: treePaths,
+    icons: { set: 'complete' },
+    search: true,
+    dragAndDrop: true,
+    composition: {
+      contextMenu: {
+        enabled: true,
+        triggerMode: 'both',
+        buttonVisibility: 'when-needed',
+      },
+    },
+  });
 
   useEffect(() => {
     window.electronAPI.settings.get().then(settings => {
@@ -49,11 +80,27 @@ export function PlaylistSidebar() {
       const newItems: MediaSource[] = files.map((filePath: string) => ({
         id: filePath,
         type: 'local' as const,
-        mediaType: 'audio', // Default
+        mediaType: getMediaType(filePath),
         path: filePath,
         title: filePath.split('/').pop() || 'Unknown'
       }));
       newItems.forEach((item: MediaSource) => addToPlaylist(item));
+    }
+  };
+
+  const handleAddFolder = async () => {
+    const files = await window.electronAPI.file.openFolderDialog();
+    if (files && files.length > 0) {
+      const newItems: MediaSource[] = files.map((filePath: string) => ({
+        id: filePath,
+        type: 'local' as const,
+        mediaType: getMediaType(filePath),
+        path: filePath,
+        title: filePath.split('/').pop() || 'Unknown'
+      }));
+      newItems.forEach((item: MediaSource) => addToPlaylist(item));
+      setExplorerPaths(files);
+      setView('explorer');
     }
   };
 
@@ -133,13 +180,19 @@ export function PlaylistSidebar() {
         >
           Library
         </button>
+        <button
+          onClick={() => setView('explorer')}
+          className={`text-xs font-black uppercase tracking-widest transition-colors ${view === 'explorer' ? 'text-primary-500' : 'text-gray-500 hover:text-white'}`}
+        >
+          Explorer
+        </button>
       </div>
 
       <div className="p-6 flex flex-col gap-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-              {view === 'queue' ? 'Playing Next' : 'Your Playlists'}
+              {view === 'queue' ? 'Playing Next' : view === 'library' ? 'Your Playlists' : 'File Explorer'}
             </h2>
           </div>
           <div className="flex items-center gap-1.5">
@@ -158,6 +211,13 @@ export function PlaylistSidebar() {
                   title="Download from URL"
                 >
                   <Download className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleAddFolder}
+                  className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-300"
+                  title="Add Folder"
+                >
+                  <FolderPlus className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleAddFiles}
@@ -226,7 +286,66 @@ export function PlaylistSidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-6 space-y-1">
-        {view === 'queue' ? (
+        {view === 'explorer' ? (
+          explorerPaths.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8">
+              <FolderOpen className="w-8 h-8 text-gray-600 mb-4" />
+              <p className="text-gray-500 text-sm font-medium">Add a folder to explore</p>
+            </div>
+          ) : (
+            <div className="h-full w-full" style={{ 
+              '--trees-bg': 'transparent', 
+              '--trees-row-hover-bg': 'rgba(255, 255, 255, 0.05)',
+              '--trees-row-selected-bg': 'rgba(255, 255, 255, 0.1)',
+              '--trees-text': '#d1d5db',
+              '--trees-text-muted': '#9ca3af'
+            } as React.CSSProperties}>
+              <FileTree 
+                model={treeModel} 
+                className="h-full"
+                renderContextMenu={(item, context) => (
+                  <div className="rounded-md border border-white/10 bg-black/90 p-1 shadow-xl flex flex-col min-w-[120px] z-50">
+                    <button
+                      className="text-xs text-left px-2 py-1.5 text-white hover:bg-white/10 rounded transition-colors"
+                      onClick={() => {
+                        context.close({ restoreFocus: false });
+                        const realPath = item.path.replace(/^(Audio|Video|Images)/, '');
+                        addToPlaylist({
+                          id: realPath,
+                          type: 'local',
+                          mediaType: getMediaType(realPath),
+                          path: realPath,
+                          title: realPath.split('/').pop() || 'Unknown'
+                        });
+                      }}
+                      type="button"
+                    >
+                      Add to Queue
+                    </button>
+                    <button
+                      className="text-xs text-left px-2 py-1.5 text-white hover:bg-white/10 rounded transition-colors"
+                      onClick={() => {
+                        context.close({ restoreFocus: false });
+                        const realPath = item.path.replace(/^(Audio|Video|Images)/, '');
+                        addToPlaylist({
+                          id: realPath,
+                          type: 'local',
+                          mediaType: getMediaType(realPath),
+                          path: realPath,
+                          title: realPath.split('/').pop() || 'Unknown'
+                        });
+                        playAtIndex(playlist.length); // Play this newly added item
+                      }}
+                      type="button"
+                    >
+                      Play Now
+                    </button>
+                  </div>
+                )}
+              />
+            </div>
+          )
+        ) : view === 'queue' ? (
           playlist.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-8">
               <ListMusic className="w-8 h-8 text-gray-600 mb-4" />
@@ -255,8 +374,12 @@ export function PlaylistSidebar() {
                   <div className="text-[10px] text-gray-600 truncate">{item.artist || 'Unknown'}</div>
                 </div>
                 <button
-                  onClick={() => removeFromPlaylist(index)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 transition-all"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    removeFromPlaylist(index);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-red-400 transition-all z-10"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
