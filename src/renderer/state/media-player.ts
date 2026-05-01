@@ -63,11 +63,35 @@ export const useMediaPlayerStore = create<MediaPlayerStore>((set, get) => ({
 
     // 2. Listen for changes from Main
     window.electronAPI.media.onStateChanged((newState) => {
-      const oldSource = get().currentSource;
+      const current = get();
+      const oldSource = current.currentSource;
+
+      // 1. Position Protection: The renderer is the source of truth for 'position' while playing.
+      // If the remote state is lagging behind or resetting to 0 for the same track, ignore it.
+      if (current.status === 'playing' && newState.status === 'playing') {
+        const isSameTrack = oldSource && newState.currentSource && (oldSource.id === newState.currentSource.id || oldSource.path === newState.currentSource.path);
+        if (isSameTrack) {
+          // If remote is 0 or lagging by more than 1 second, keep local position
+          if (newState.position === 0 || (newState.position < current.position && (current.position - newState.position) < 30)) {
+            newState.position = current.position;
+          }
+        }
+      }
+
+      // 2. Track Change Detection: Only trigger 'playAtIndex' if the track IDENTITY has changed.
+      // We check both ID and Path to be safe.
+      const hasTrack = !!newState.currentSource;
+      const isNewTrack = hasTrack && (
+        !oldSource || 
+        (oldSource.id !== newState.currentSource.id && oldSource.path !== newState.currentSource.path)
+      );
+
+      // 3. Update mirrored state
       set({ ...newState });
 
-      // If the track changed, we need to get a new stream URL
-      if (newState.currentSource && (!oldSource || oldSource.path !== newState.currentSource.path)) {
+      // 4. Enrichment: If it's a real track change, fetch metadata/streamUrl
+      if (isNewTrack && newState.currentIndex !== -1) {
+        console.log(`[MediaPlayerStore] Real track change to index ${newState.currentIndex}: ${newState.currentSource?.title}`);
         get().playAtIndex(newState.currentIndex);
       }
     });

@@ -50,7 +50,7 @@ const getMediaType = (path: string): 'audio' | 'video' | 'image' => {
 };
 
 export function App() {
-  const { addToPlaylist, playAtIndex, playlist, status, streamUrl, currentSource, play, pause } = useMediaPlayerStore();
+  const { addToPlaylist, playAtIndex, playlist, status, streamUrl, currentSource, play, pause, toggleMute } = useMediaPlayerStore();
   const { syncJobs, initializeListeners } = useJobsStore();
   const { tabs: pluginTabs, init: initPlugins } = usePluginStore();
   const { init: initProviders } = useProviderStore();
@@ -115,6 +115,10 @@ export function App() {
         } else {
           play();
         }
+      }
+
+      if (e.code === 'KeyM') {
+        toggleMute();
       }
     };
 

@@ -187,11 +187,15 @@ export class LibraryService extends EventEmitter {
       const files = await Promise.all(dirents.map((dirent) => {
         const res = path.resolve(dir, dirent.name);
         if (dirent.isDirectory()) {
-          // Robust hidden/system directory check
-          if (dirent.name.startsWith('.') || dirent.name.startsWith('$') || dirent.name === 'node_modules') {
-            console.log(`[LibraryService] Skipping hidden/system directory: ${dirent.name}`);
+          const isHidden = dirent.name.startsWith('.') || dirent.name.startsWith('$');
+          const isIgnored = ['node_modules', 'Library', 'Cache', 'CachedData', 'logs'].includes(dirent.name);
+          
+          if (isHidden || isIgnored) {
+            console.log(`[LibraryService] SKIPPING: ${dirent.name} (Hidden: ${isHidden}, Ignored: ${isIgnored})`);
             return [];
           }
+          
+          console.log(`[LibraryService] ENTERING: ${res}`);
           return this.recursiveReaddir(res);
         }
         return res;
