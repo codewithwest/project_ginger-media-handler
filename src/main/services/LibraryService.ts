@@ -186,7 +186,15 @@ export class LibraryService extends EventEmitter {
       const dirents = await fs.promises.readdir(dir, { withFileTypes: true });
       const files = await Promise.all(dirents.map((dirent) => {
         const res = path.resolve(dir, dirent.name);
-        return dirent.isDirectory() ? this.recursiveReaddir(res) : res;
+        if (dirent.isDirectory()) {
+          // Robust hidden/system directory check
+          if (dirent.name.startsWith('.') || dirent.name.startsWith('$') || dirent.name === 'node_modules') {
+            console.log(`[LibraryService] Skipping hidden/system directory: ${dirent.name}`);
+            return [];
+          }
+          return this.recursiveReaddir(res);
+        }
+        return res;
       }));
       return files.flat();
     } catch (e) {
