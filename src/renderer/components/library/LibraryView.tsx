@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useLibraryStore } from '../../state/library';
 import { useMediaPlayerStore } from '../../state/media-player';
-import { FolderPlus, Music, Play, X, Loader2, FileAudio, LayoutGrid, List } from 'lucide-react';
+import { FolderPlus, Music, Play, X, Loader2, FileAudio, LayoutGrid, List, Video, Image } from 'lucide-react';
 import type { LibraryTrack } from '@shared/types';
 
 export function LibraryView({ onClose }: { onClose: () => void }) {
   const { folders, tracks, isLoading, loadLibrary, addFolder, removeFolder, scanLibrary } = useLibraryStore();
   const addToPlaylist = useMediaPlayerStore(state => state.addToPlaylist);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'audio' | 'video' | 'image'>('all');
+
+  const filteredTracks = tracks.filter(t => mediaTypeFilter === 'all' || t.mediaType === mediaTypeFilter);
 
   useEffect(() => {
     loadLibrary();
@@ -141,34 +144,70 @@ export function LibraryView({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {tracks.length === 0 ? (
+          {/* Media Type Tabs */}
+          <div className="flex gap-2 mb-6 border-b border-white/10 pb-4 flex-shrink-0">
+            {(['all', 'audio', 'video', 'image'] as const).map(type => (
+              <button
+                key={type}
+                onClick={() => setMediaTypeFilter(type)}
+                className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all ${
+                  mediaTypeFilter === type 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {type === 'all' ? 'All Media' : type}
+              </button>
+            ))}
+          </div>
+
+          {filteredTracks.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
               <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-6">
-                <Music className="w-12 h-12 opacity-20" />
+                {mediaTypeFilter === 'audio' ? <Music className="w-12 h-12 opacity-20" /> :
+                 mediaTypeFilter === 'video' ? <Video className="w-12 h-12 opacity-20" /> :
+                 mediaTypeFilter === 'image' ? <Image className="w-12 h-12 opacity-20" /> :
+                 <Music className="w-12 h-12 opacity-20" />}
               </div>
-              <p className="text-lg font-medium">Your library is empty</p>
-              <p className="text-sm text-gray-500 mt-1">Add a folder to start scanning your media.</p>
+              <p className="text-lg font-medium">No {mediaTypeFilter === 'all' ? 'media' : mediaTypeFilter + 's'} found</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {tracks.length === 0 ? 'Add a folder to start scanning your media.' : 'Try a different category.'}
+              </p>
+            </div>
+          ) : viewMode === 'tree' ? (
+            <div className="flex-1 overflow-hidden" style={{ 
+              '--trees-bg': 'transparent', 
+              '--trees-row-hover-bg': 'rgba(255, 255, 255, 0.05)',
+              '--trees-row-selected-bg': 'rgba(255, 255, 255, 0.1)',
+              '--trees-text': '#d1d5db',
+              '--trees-text-muted': '#9ca3af'
+            } as React.CSSProperties}>
+              <LibraryTreeView tracks={filteredTracks} onPlay={handlePlay} onConvert={handleConvert} />
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-0">
               <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-3"}>
-                  {tracks.map((track, index) => (
-                    <div key={track.id || track.path || index} className={`group bg-black/40 hover:bg-white/5 rounded-2xl transition-all border border-white/5 hover:border-white/10 flex items-center gap-4 ${viewMode === 'list' ? 'p-3' : 'p-4'}`}>
+                  {filteredTracks.map((track, index) => (
+                    <div key={`${track.id}-${index}`} className={`group bg-black/40 hover:bg-white/5 rounded-2xl transition-all border border-white/5 hover:border-white/10 flex items-center gap-4 ${viewMode === 'list' ? 'p-3' : 'p-4'}`}>
                         <div className={`${viewMode === 'list' ? 'w-10 h-10' : 'w-12 h-12'} rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 flex-shrink-0 group-hover:scale-110 transition-transform`}>
-                            <Music className={viewMode === 'list' ? 'w-5 h-5' : 'w-6 h-6'} />
+                            {track.mediaType === 'video' ? <Video className={viewMode === 'list' ? 'w-5 h-5' : 'w-6 h-6'} /> :
+                             track.mediaType === 'image' ? <Image className={viewMode === 'list' ? 'w-5 h-5' : 'w-6 h-6'} /> :
+                             <Music className={viewMode === 'list' ? 'w-5 h-5' : 'w-6 h-6'} />}
                         </div>
                         <div className="flex-1 min-w-0">
                             <h3 className="font-bold truncate text-sm text-gray-200" title={track.title}>{track.title || 'Untitled Track'}</h3>
-                            <p className="text-xs text-gray-500 font-medium mt-0.5">{track.artist || 'Unknown Artist'}</p>
+                            <p className="text-xs text-gray-500 font-medium mt-0.5">{track.artist || track.mediaType.toUpperCase()}</p>
                         </div>
                         <div className="flex items-center gap-2 pr-2">
-                            <button
-                                onClick={(e) => { e.stopPropagation(); handleConvert(track); }}
-                                className="p-2 hover:bg-indigo-500/20 rounded-xl transition-all text-gray-500 hover:text-indigo-400"
-                                title="Add to Converter"
-                            >
-                                <FileAudio className="w-5 h-5" />
-                            </button>
+                            {track.mediaType !== 'image' && (
+                              <button
+                                  onClick={(e) => { e.stopPropagation(); handleConvert(track); }}
+                                  className="p-2 hover:bg-indigo-500/20 rounded-xl transition-all text-gray-500 hover:text-indigo-400"
+                                  title="Add to Converter"
+                              >
+                                  <FileAudio className="w-5 h-5" />
+                              </button>
+                            )}
                             <button
                                 onClick={(e) => { e.stopPropagation(); handlePlay(track); }}
                                 className={`${viewMode === 'list' ? 'p-2' : 'p-2.5'} bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-95`}

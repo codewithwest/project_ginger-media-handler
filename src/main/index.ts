@@ -180,6 +180,10 @@ async function registerIpcHandlers(): Promise<void> {
     mainWindow?.webContents.send('library:scan-progress', progress);
   });
 
+  libraryService.on('scan-track-added', (track) => {
+    mainWindow?.webContents.send('library:scan-track-added', track);
+  });
+
   libraryService.on('scan-complete', (tracks) => {
     mainWindow?.webContents.send('library:scan-complete', tracks);
   });

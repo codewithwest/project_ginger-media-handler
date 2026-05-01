@@ -32,6 +32,14 @@ export const useLibraryStore = create<LibraryStore>((set) => ({
       set({ scanProgress: progress, isLoading: true });
     });
 
+    const unsubTrackAdded = window.electronAPI.library.onTrackAdded((track) => {
+      set((state) => {
+        // Simple deduplication locally just in case
+        if (state.tracks.some(t => t.path === track.path)) return state;
+        return { tracks: [...state.tracks, track], isLoading: true };
+      });
+    });
+
     const unsubComplete = window.electronAPI.library.onScanComplete((tracks) => {
       set({ tracks, isLoading: false, scanProgress: null });
     });
@@ -40,6 +48,7 @@ export const useLibraryStore = create<LibraryStore>((set) => ({
     return () => {
       unsubStart();
       unsubProgress();
+      unsubTrackAdded();
       unsubComplete();
     };
   },
