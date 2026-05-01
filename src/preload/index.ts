@@ -82,6 +82,8 @@ const electronAPI = {
   file: {
     openDialog: () =>
       ipcRenderer.invoke('file:open-dialog'),
+    openFolderDialog: () =>
+      ipcRenderer.invoke('file:open-folder-dialog'),
     addToPlaylist: (paths: string[]) =>
       ipcRenderer.invoke('file:add-to-playlist', { paths }),
     onFileOpenFromCLI: (callback: (path: string) => void) => {
@@ -134,6 +136,26 @@ const electronAPI = {
     getFolders: (): Promise<string[]> => ipcRenderer.invoke('library:get-folders'),
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('library:pick-folder'),
     rename: (id: string, newName: string): Promise<LibraryTrack> => ipcRenderer.invoke('library:rename', { id, newName }),
+    onScanStart: (callback: () => void) => {
+      const subscription = () => callback();
+      ipcRenderer.on('library:scan-start', subscription);
+      return () => { ipcRenderer.removeListener('library:scan-start', subscription); };
+    },
+    onScanProgress: (callback: (progress: { processed: number, total: number, currentFile: string }) => void) => {
+      const subscription = (_event: IpcRendererEvent, progress: any) => callback(progress);
+      ipcRenderer.on('library:scan-progress', subscription);
+      return () => { ipcRenderer.removeListener('library:scan-progress', subscription); };
+    },
+    onScanComplete: (callback: (tracks: LibraryTrack[]) => void) => {
+      const subscription = (_event: IpcRendererEvent, tracks: LibraryTrack[]) => callback(tracks);
+      ipcRenderer.on('library:scan-complete', subscription);
+      return () => { ipcRenderer.removeListener('library:scan-complete', subscription); };
+    },
+    onTrackAdded: (callback: (track: LibraryTrack) => void) => {
+      const subscription = (_event: IpcRendererEvent, track: LibraryTrack) => callback(track);
+      ipcRenderer.on('library:scan-track-added', subscription);
+      return () => { ipcRenderer.removeListener('library:scan-track-added', subscription); };
+    },
   },
 
   // Window controls

@@ -85,6 +85,7 @@ export class LibraryService extends EventEmitter {
 
     // existing tracks map for quick lookup
     const existingMap = new Map(this.data.tracks.map(t => [t.path, t]));
+    const processedPaths = new Set<string>(); // Prevent duplicates if folders overlap
     let processedCount = 0;
 
     for (const folder of this.data.folders) {
@@ -94,6 +95,10 @@ export class LibraryService extends EventEmitter {
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        
+        if (processedPaths.has(file)) continue;
+        processedPaths.add(file);
+
         const ext = path.extname(file).toLowerCase();
 
         if (supportedExts.includes(ext)) {
@@ -122,6 +127,7 @@ export class LibraryService extends EventEmitter {
               };
 
               newTracks.push(track);
+              this.emit('scan-track-added', track);
             } catch (err) {
               console.warn(`Failed to process file ${file}:`, err);
             }
@@ -180,7 +186,19 @@ export class LibraryService extends EventEmitter {
       const dirents = await fs.promises.readdir(dir, { withFileTypes: true });
       const files = await Promise.all(dirents.map((dirent) => {
         const res = path.resolve(dir, dirent.name);
-        return dirent.isDirectory() ? this.recursiveReaddir(res) : res;
+        if (dirent.isDirectory()) {
+          const isHidden = dirent.name.startsWith('.') || dirent.name.startsWith('$');
+          const isIgnored = ['node_modules', 'Library', 'Cache', 'CachedData', 'logs'].includes(dirent.name);
+          
+          if (isHidden || isIgnored) {
+            console.log(`[LibraryService] SKIPPING: ${dirent.name} (Hidden: ${isHidden}, Ignored: ${isIgnored})`);
+            return [];
+          }
+          
+          console.log(`[LibraryService] ENTERING: ${res}`);
+          return this.recursiveReaddir(res);
+        }
+        return res;
       }));
       return files.flat();
     } catch (e) {
