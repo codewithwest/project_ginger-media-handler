@@ -9,8 +9,13 @@ export function LibraryView({ onClose }: { onClose: () => void }) {
   const addToPlaylist = useMediaPlayerStore(state => state.addToPlaylist);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'audio' | 'video' | 'image'>('all');
+  const [visibleCount, setVisibleCount] = useState(50);
 
   const filteredTracks = tracks.filter(t => mediaTypeFilter === 'all' || t.mediaType === mediaTypeFilter);
+
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [mediaTypeFilter]);
 
   useEffect(() => {
     loadLibrary();
@@ -185,9 +190,17 @@ export function LibraryView({ onClose }: { onClose: () => void }) {
               <LibraryTreeView tracks={filteredTracks} onPlay={handlePlay} onConvert={handleConvert} />
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-0">
+            <div 
+              className="flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-0"
+              onScroll={(e) => {
+                const target = e.target as HTMLDivElement;
+                if (target.scrollHeight - target.scrollTop <= target.clientHeight + 300) {
+                  setVisibleCount(prev => Math.min(prev + 50, filteredTracks.length));
+                }
+              }}
+            >
               <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-3"}>
-                  {filteredTracks.map((track, index) => (
+                  {filteredTracks.slice(0, visibleCount).map((track, index) => (
                     <div key={`${track.id}-${index}`} className={`group bg-black/40 hover:bg-white/5 rounded-2xl transition-all border border-white/5 hover:border-white/10 flex items-center gap-4 ${viewMode === 'list' ? 'p-3' : 'p-4'}`}>
                         <div className={`${viewMode === 'list' ? 'w-10 h-10' : 'w-12 h-12'} rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 flex-shrink-0 group-hover:scale-110 transition-transform`}>
                             {track.mediaType === 'video' ? <Video className={viewMode === 'list' ? 'w-5 h-5' : 'w-6 h-6'} /> :
