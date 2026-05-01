@@ -1,19 +1,60 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLibraryStore } from '../../state/library';
 import { useMediaPlayerStore } from '../../state/media-player';
-import { FolderPlus, Music, Play, X, Loader2, FileAudio, LayoutGrid, List } from 'lucide-react';
+import { FolderPlus, Music, Play, X, Loader2, FileAudio, LayoutGrid, List, Video, Image, Eye } from 'lucide-react';
 import type { LibraryTrack } from '@shared/types';
 
 export function LibraryView({ onClose }: { onClose: () => void }) {
-  const { folders, tracks, isLoading, loadLibrary, addFolder, removeFolder, scanLibrary } = useLibraryStore();
+  const { folders, tracks, isLoading, scanProgress, loadLibrary, addFolder, removeFolder, scanLibrary, init } = useLibraryStore();
   const addToPlaylist = useMediaPlayerStore(state => state.addToPlaylist);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'audio' | 'video' | 'image'>('all');
+  const [visibleCount, setVisibleCount] = useState(50);
+  const [previewTrack, setPreviewTrack] = useState<LibraryTrack | null>(null);
+  const [scanStartTime, setScanStartTime] = useState<number | null>(null);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  const filteredTracks = tracks.filter(t => mediaTypeFilter === 'all' || t.mediaType === mediaTypeFilter);
 
   useEffect(() => {
+    setVisibleCount(50);
+  }, [mediaTypeFilter]);
+
+  useEffect(() => {
+    const cleanup = init();
     loadLibrary();
-  }, [loadLibrary]);
+    return cleanup;
+  }, [init, loadLibrary]);
+
+  useEffect(() => {
+    if (isLoading) {
+      if (!scanStartTime) setScanStartTime(Date.now());
+      const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+      return () => clearInterval(timer);
+    } else {
+      setScanStartTime(null);
+    }
+  }, [isLoading]);
+
+  const elapsedTime = scanStartTime ? Math.floor((currentTime - scanStartTime) / 1000) : 0;
+  
+  const formatDuration = (seconds: number) => {
+    if (seconds <= 0) return '0s';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  };
+
+  const eta = (isLoading && scanProgress && scanProgress.processed > 0 && scanProgress.total > scanProgress.processed)
+    ? Math.floor((elapsedTime / scanProgress.processed) * (scanProgress.total - scanProgress.processed))
+    : null;
 
   const handlePlay = (track: LibraryTrack) => {
+    if (track.mediaType === 'image') {
+      setPreviewTrack(track);
+      return;
+    }
     addToPlaylist({
       id: track.id,
       path: track.path,
@@ -92,7 +133,37 @@ export function LibraryView({ onClose }: { onClose: () => void }) {
         {/* Main Content - Tracks */}
         <div className="flex-1 bg-white/5 rounded-3xl p-8 border border-white/10 overflow-hidden flex flex-col glass min-w-0">
           <div className="flex justify-between items-center mb-8 flex-shrink-0">
-            <h2 className="text-2xl font-bold">All Tracks <span className="text-gray-500 font-medium ml-2 text-lg">({tracks.length})</span></h2>
+            <div className="flex flex-col">
+              <h2 className="text-2xl font-bold">All Tracks <span className="text-gray-500 font-medium ml-2 text-lg">({tracks.length})</span></h2>
+              {isLoading && scanProgress && (
+                <div className="flex items-center gap-4 mt-2 animate-in fade-in slide-in-from-left-4 duration-300">
+                  <div className="flex items-center gap-2 px-3 py-1 bg-indigo-500/10 rounded-full border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
+                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-ping" />
+                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
+                      {scanProgress.processed} items
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 text-[10px] font-medium text-gray-500">
+                    <div className="flex items-center gap-1.5">
+                      <span className="opacity-50 uppercase text-[8px] font-black">Elapsed</span>
+                      <span className="text-gray-300 tabular-nums">{formatDuration(elapsedTime)}</span>
+                    </div>
+                    
+                    {eta !== null && eta > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="opacity-50 uppercase text-[8px] font-black">ETA</span>
+                        <span className="text-indigo-400 tabular-nums">{formatDuration(eta)}</span>
+                      </div>
+                    )}
+
+                    <span className="text-gray-600 ml-2 truncate max-w-[200px] italic">
+                      {scanProgress.currentFile}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               {/* View Mode Toggle */}
               <div className="flex items-center gap-1 bg-white/5 rounded-2xl p-1 border border-white/10">
@@ -141,40 +212,101 @@ export function LibraryView({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {tracks.length === 0 ? (
+          {/* Media Type Tabs */}
+          <div className="flex gap-2 mb-6 border-b border-white/10 pb-4 flex-shrink-0">
+            {(['all', 'audio', 'video', 'image'] as const).map(type => (
+              <button
+                key={type}
+                onClick={() => setMediaTypeFilter(type)}
+                className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all ${
+                  mediaTypeFilter === type 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                    : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {type === 'all' ? 'All Media' : type}
+              </button>
+            ))}
+          </div>
+
+          {filteredTracks.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
               <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-6">
-                <Music className="w-12 h-12 opacity-20" />
+                {mediaTypeFilter === 'audio' ? <Music className="w-12 h-12 opacity-20" /> :
+                 mediaTypeFilter === 'video' ? <Video className="w-12 h-12 opacity-20" /> :
+                 mediaTypeFilter === 'image' ? <Image className="w-12 h-12 opacity-20" /> :
+                 <Music className="w-12 h-12 opacity-20" />}
               </div>
-              <p className="text-lg font-medium">Your library is empty</p>
-              <p className="text-sm text-gray-500 mt-1">Add a folder to start scanning your media.</p>
+              <p className="text-lg font-medium">No {mediaTypeFilter === 'all' ? 'media' : mediaTypeFilter + 's'} found</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {tracks.length === 0 ? 'Add a folder to start scanning your media.' : 'Try a different category.'}
+              </p>
+            </div>
+          ) : viewMode === 'tree' ? (
+            <div className="flex-1 overflow-hidden" style={{ 
+              '--trees-bg': 'transparent', 
+              '--trees-row-hover-bg': 'rgba(255, 255, 255, 0.05)',
+              '--trees-row-selected-bg': 'rgba(255, 255, 255, 0.1)',
+              '--trees-text': '#d1d5db',
+              '--trees-text-muted': '#9ca3af'
+            } as React.CSSProperties}>
+              <LibraryTreeView tracks={filteredTracks} onPlay={handlePlay} onConvert={handleConvert} />
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-0">
+            <div 
+              className="flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-0"
+              onScroll={(e) => {
+                const target = e.target as HTMLDivElement;
+                if (target.scrollHeight - target.scrollTop <= target.clientHeight + 300) {
+                  setVisibleCount(prev => Math.min(prev + 50, filteredTracks.length));
+                }
+              }}
+            >
               <div className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-3"}>
-                  {tracks.map((track, index) => (
-                    <div key={track.id || track.path || index} className={`group bg-black/40 hover:bg-white/5 rounded-2xl transition-all border border-white/5 hover:border-white/10 flex items-center gap-4 ${viewMode === 'list' ? 'p-3' : 'p-4'}`}>
-                        <div className={`${viewMode === 'list' ? 'w-10 h-10' : 'w-12 h-12'} rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 flex-shrink-0 group-hover:scale-110 transition-transform`}>
-                            <Music className={viewMode === 'list' ? 'w-5 h-5' : 'w-6 h-6'} />
+                  {filteredTracks.slice(0, visibleCount).map((track, index) => (
+                    <div key={`${track.id}-${index}`} className={`group bg-black/40 hover:bg-white/5 rounded-2xl transition-all border border-white/5 hover:border-white/10 flex items-center gap-4 ${viewMode === 'list' ? 'p-3' : 'p-4'}`}>
+                        <div className={`${viewMode === 'list' ? 'w-10 h-10' : 'w-12 h-12'} rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 flex-shrink-0 group-hover:scale-110 transition-transform overflow-hidden relative`}>
+                            {(track.mediaType === 'image' || track.mediaType === 'video') ? (
+                               <>
+                                 <img 
+                                   src={`http://127.0.0.1:3000/thumbnail?path=${encodeURIComponent(track.path)}`} 
+                                   alt={track.title} 
+                                   className="w-full h-full object-cover absolute inset-0 z-10"
+                                   loading="lazy"
+                                   onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                 />
+                                 {track.mediaType === 'video' ? 
+                                    <Video className={viewMode === 'list' ? 'w-5 h-5 absolute z-0' : 'w-6 h-6 absolute z-0'} /> : 
+                                    <Image className={viewMode === 'list' ? 'w-5 h-5 absolute z-0' : 'w-6 h-6 absolute z-0'} />
+                                 }
+                               </>
+                             ) :
+                             <Music className={viewMode === 'list' ? 'w-5 h-5' : 'w-6 h-6'} />}
                         </div>
                         <div className="flex-1 min-w-0">
                             <h3 className="font-bold truncate text-sm text-gray-200" title={track.title}>{track.title || 'Untitled Track'}</h3>
-                            <p className="text-xs text-gray-500 font-medium mt-0.5">{track.artist || 'Unknown Artist'}</p>
+                            <p className="text-xs text-gray-500 font-medium mt-0.5 truncate" title={track.path}>{track.artist || track.mediaType.toUpperCase()} • {track.path}</p>
                         </div>
                         <div className="flex items-center gap-2 pr-2">
-                            <button
-                                onClick={(e) => { e.stopPropagation(); handleConvert(track); }}
-                                className="p-2 hover:bg-indigo-500/20 rounded-xl transition-all text-gray-500 hover:text-indigo-400"
-                                title="Add to Converter"
-                            >
-                                <FileAudio className="w-5 h-5" />
-                            </button>
+                            {track.mediaType !== 'image' && (
+                              <button
+                                  onClick={(e) => { e.stopPropagation(); handleConvert(track); }}
+                                  className="p-2 hover:bg-indigo-500/20 rounded-xl transition-all text-gray-500 hover:text-indigo-400"
+                                  title="Add to Converter"
+                              >
+                                  <FileAudio className="w-5 h-5" />
+                              </button>
+                            )}
                             <button
                                 onClick={(e) => { e.stopPropagation(); handlePlay(track); }}
                                 className={`${viewMode === 'list' ? 'p-2' : 'p-2.5'} bg-indigo-600 hover:bg-indigo-500 rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-95`}
-                                title="Play"
+                                title={track.mediaType === 'image' ? "Preview" : "Play"}
                             >
-                                <Play className="w-4 h-4 fill-white text-white" />
+                                {track.mediaType === 'image' ? (
+                                    <Eye className="w-4 h-4 text-white" />
+                                ) : (
+                                    <Play className="w-4 h-4 fill-white text-white" />
+                                )}
                             </button>
                         </div>
                     </div>
@@ -184,6 +316,34 @@ export function LibraryView({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
+
+      {/* Image Preview Overlay */}
+      {previewTrack && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-xl flex flex-col animate-fade-in">
+          <div className="h-20 px-8 flex items-center justify-between border-b border-white/5 bg-white/5 flex-shrink-0">
+            <div className="flex items-center gap-4 min-w-0">
+              <button
+                onClick={() => setPreviewTrack(null)}
+                className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-all flex-shrink-0"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-white tracking-tight truncate">{previewTrack.title}</h3>
+                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest truncate">{previewTrack.path}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 relative flex items-center justify-center p-8 overflow-hidden">
+            <img
+              src={`http://127.0.0.1:3000/file?path=${encodeURIComponent(previewTrack.path)}`}
+              alt={previewTrack.title}
+              className="max-w-full max-h-full object-contain shadow-2xl animate-fade-in"
+            />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
